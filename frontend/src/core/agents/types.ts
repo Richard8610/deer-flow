@@ -23,3 +23,7 @@ export interface UpdateAgentRequest {
   skills?: string[] | null;
   soul?: string | null;
 }
+
+export interface UserProfile {
+  content: string | null;
+}

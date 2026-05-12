@@ -1,11 +1,12 @@
 import { fetch } from "@/core/api/fetcher";
 import { getBackendBaseURL } from "@/core/config";
+import { requireJson } from "@/core/utils/fetch";
 
 import type { MCPConfig } from "./types";
 
 export async function loadMCPConfig() {
   const response = await fetch(`${getBackendBaseURL()}/api/mcp/config`);
-  return response.json() as Promise<MCPConfig>;
+  return requireJson<MCPConfig>(response, "Failed to load MCP config");
 }
 
 export async function updateMCPConfig(config: MCPConfig) {
@@ -16,5 +17,5 @@ export async function updateMCPConfig(config: MCPConfig) {
     },
     body: JSON.stringify(config),
   });
-  return response.json();
+  return requireJson(response, "Failed to update MCP config");
 }
