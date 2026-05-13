@@ -57,7 +57,7 @@ interface DashboardChatProps {
   systemHint?: string;
   /** Called whenever an AI response contains a SKILL.md-looking code block. */
   onSkillBlock?: (content: string) => void;
-  /** Called whenever an AI response contains a JSON tool config block. */
+  /** Called whenever an AI response contains a JSON tool-config block. */
   onToolJson?: (json: Record<string, unknown>) => void;
   className?: string;
   inputPlaceholder?: string;
