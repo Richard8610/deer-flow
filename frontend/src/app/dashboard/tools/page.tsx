@@ -199,7 +199,7 @@ function ToolEditor({
         </div>
       </div>
 
-      <div className={aiMode ? "flex h-[500px]" : "p-5"}>
+      <div className={aiMode ? "flex h-125" : "p-5"}>
         {aiMode && (
           <div className="flex w-1/2 flex-col border-r">
             <div className="border-b bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
