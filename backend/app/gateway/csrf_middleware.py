@@ -29,6 +29,17 @@ def generate_csrf_token() -> str:
     return secrets.token_urlsafe(CSRF_TOKEN_LENGTH)
 
 
+_CSRF_EXEMPT_PATHS: frozenset[str] = frozenset(
+    {
+        "/api/v1/auth/me",
+        # AI Assist is a server-proxied endpoint — the Next.js route handler
+        # forwards the request server-side so the browser CSRF cookie may not
+        # be available. The endpoint is already protected by AuthMiddleware.
+        "/api/assist",
+    }
+)
+
+
 def should_check_csrf(request: Request) -> bool:
     """Determine if a request needs CSRF validation.
 
@@ -39,8 +50,7 @@ def should_check_csrf(request: Request) -> bool:
         return False
 
     path = request.url.path.rstrip("/")
-    # Exempt /api/v1/auth/me endpoint
-    if path == "/api/v1/auth/me":
+    if path in _CSRF_EXEMPT_PATHS:
         return False
     return True
 
@@ -204,7 +214,21 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
 
-        # For auth endpoints that set up session, also set CSRF cookie
+        # Issue a CSRF token cookie whenever the client doesn't already have one.
+        # This covers sessions that bypass the login flow (e.g. no-auth setups) so
+        # that subsequent state-changing requests can include the token.
+        if not request.cookies.get(CSRF_COOKIE_NAME) and request.method == "GET":
+            csrf_token = generate_csrf_token()
+            is_https = is_secure_request(request)
+            response.set_cookie(
+                key=CSRF_COOKIE_NAME,
+                value=csrf_token,
+                httponly=False,
+                secure=is_https,
+                samesite="strict",
+            )
+
+        # For auth endpoints that set up session, also refresh the CSRF cookie
         if _is_auth and request.method == "POST":
             # Generate a new CSRF token for the session
             csrf_token = generate_csrf_token()

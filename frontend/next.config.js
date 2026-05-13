@@ -23,6 +23,10 @@ const config = {
   devIndicators: false,
   async rewrites() {
     const rewrites = [];
+    const langgraphURL = getInternalServiceURL(
+      "DEER_FLOW_INTERNAL_LANGGRAPH_BASE_URL",
+      "http://127.0.0.1:8001/api",
+    );
     const gatewayURL = getInternalServiceURL(
       "DEER_FLOW_INTERNAL_GATEWAY_BASE_URL",
       "http://127.0.0.1:8001",
@@ -31,42 +35,40 @@ const config = {
     if (!process.env.NEXT_PUBLIC_LANGGRAPH_BASE_URL) {
       rewrites.push({
         source: "/api/langgraph",
-        destination: `${gatewayURL}/api`,
+        destination: langgraphURL,
       });
       rewrites.push({
         source: "/api/langgraph/:path*",
-        destination: `${gatewayURL}/api/:path*`,
+        destination: `${langgraphURL}/:path*`,
       });
     }
 
     if (!process.env.NEXT_PUBLIC_BACKEND_BASE_URL) {
+      for (const route of ["agents", "skills", "mcp", "memory", "models", "tools", "tool-groups"]) {
+        rewrites.push({
+          source: `/api/${route}`,
+          destination: `${gatewayURL}/api/${route}`,
+        });
+        rewrites.push({
+          source: `/api/${route}/:path*`,
+          destination: `${gatewayURL}/api/${route}/:path*`,
+        });
+      }
+
+      // Auth endpoints — required for browser-side login/setup/register calls
       rewrites.push({
-        source: "/api/agents",
-        destination: `${gatewayURL}/api/agents`,
-      });
-      rewrites.push({
-        source: "/api/agents/:path*",
-        destination: `${gatewayURL}/api/agents/:path*`,
-      });
-      rewrites.push({
-        source: "/api/skills",
-        destination: `${gatewayURL}/api/skills`,
-      });
-      rewrites.push({
-        source: "/api/skills/:path*",
-        destination: `${gatewayURL}/api/skills/:path*`,
+        source: "/api/v1/auth/:path*",
+        destination: `${gatewayURL}/api/v1/auth/:path*`,
       });
 
-      // Catch-all for remaining gateway API routes (models, threads, memory,
-      // mcp, artifacts, uploads, suggestions, runs, etc.) that don't have
-      // their own NEXT_PUBLIC_* env var toggle.
-      //
-      // NOTE: this must come AFTER the /api/langgraph rewrite above so that
-      // LangGraph-compatible routes keep their public prefix while Gateway
-      // receives its native /api/* paths.
+      // Threads, runs, feedback, suggestions, uploads, channels
       rewrites.push({
-        source: "/api/:path*",
-        destination: `${gatewayURL}/api/:path*`,
+        source: "/api/threads/:path*",
+        destination: `${gatewayURL}/api/threads/:path*`,
+      });
+      rewrites.push({
+        source: "/api/runs/:path*",
+        destination: `${gatewayURL}/api/runs/:path*`,
       });
     }
 

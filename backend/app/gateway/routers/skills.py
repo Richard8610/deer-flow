@@ -70,6 +70,11 @@ class CustomSkillHistoryResponse(BaseModel):
     history: list[dict]
 
 
+class CustomSkillCreateRequest(BaseModel):
+    name: str = Field(..., description="Skill name (hyphen-case, max 64 chars)")
+    content: str = Field(..., description="Full SKILL.md content")
+
+
 class SkillRollbackRequest(BaseModel):
     history_index: int = Field(default=-1, description="History entry index to restore from, defaulting to the latest change.")
 
@@ -133,6 +138,49 @@ async def list_custom_skills(config: AppConfig = Depends(get_config)) -> SkillsL
     except Exception as e:
         logger.error("Failed to list custom skills: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to list custom skills: {str(e)}")
+
+
+@router.post("/skills/custom", response_model=CustomSkillContentResponse, status_code=201, summary="Create Custom Skill")
+async def create_custom_skill(request: CustomSkillCreateRequest) -> CustomSkillContentResponse:
+    try:
+        from deerflow.skills.manager import (
+            custom_skill_exists,
+            public_skill_exists,
+            validate_skill_name,
+        )
+
+        validated_name = validate_skill_name(request.name)
+        if custom_skill_exists(validated_name):
+            raise HTTPException(status_code=409, detail=f"Custom skill '{validated_name}' already exists.")
+        if public_skill_exists(validated_name):
+            raise HTTPException(status_code=409, detail=f"A public skill named '{validated_name}' already exists. Choose a different name.")
+        validate_skill_markdown_content(validated_name, request.content)
+        scan = await scan_skill_content(request.content, executable=False, location=f"{validated_name}/SKILL.md")
+        if scan.decision == "block":
+            raise HTTPException(status_code=400, detail=f"Security scan blocked the skill: {scan.reason}")
+        skill_file = get_custom_skill_file(validated_name)
+        atomic_write(skill_file, request.content)
+        append_history(
+            validated_name,
+            {
+                "action": "human_create",
+                "author": "human",
+                "thread_id": None,
+                "file_path": "SKILL.md",
+                "prev_content": None,
+                "new_content": request.content,
+                "scanner": {"decision": scan.decision, "reason": scan.reason},
+            },
+        )
+        await refresh_skills_system_prompt_cache_async()
+        return await get_custom_skill(validated_name)
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("Failed to create custom skill %s: %s", request.name, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create custom skill: {str(e)}")
 
 
 @router.get("/skills/custom/{skill_name}", response_model=CustomSkillContentResponse, summary="Get Custom Skill Content")

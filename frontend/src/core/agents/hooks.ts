@@ -4,8 +4,10 @@ import {
   createAgent,
   deleteAgent,
   getAgent,
+  getUserProfile,
   listAgents,
   updateAgent,
+  updateUserProfile,
 } from "./api";
 import type { CreateAgentRequest, UpdateAgentRequest } from "./types";
 
@@ -59,6 +61,24 @@ export function useDeleteAgent() {
     mutationFn: (name: string) => deleteAgent(name),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["agents"] });
+    },
+  });
+}
+
+export function useUserProfile() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["user-profile"],
+    queryFn: () => getUserProfile(),
+  });
+  return { profile: data ?? null, isLoading, error };
+}
+
+export function useUpdateUserProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (content: string) => updateUserProfile(content),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["user-profile"] });
     },
   });
 }

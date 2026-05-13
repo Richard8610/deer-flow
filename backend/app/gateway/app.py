@@ -13,6 +13,7 @@ from app.gateway.deps import langgraph_runtime
 from app.gateway.routers import (
     agents,
     artifacts,
+    assist,
     assistants_compat,
     auth,
     channels,
@@ -25,6 +26,7 @@ from app.gateway.routers import (
     suggestions,
     thread_runs,
     threads,
+    tools,
     uploads,
 )
 from deerflow.config import app_config as deerflow_app_config
@@ -368,6 +370,12 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
 
     # Stateless Runs API (stream/wait without a pre-existing thread)
     app.include_router(runs.router)
+
+    # Tools API is mounted at /api/tools and /api/tool-groups
+    app.include_router(tools.router)
+
+    # AI Assist API — lightweight direct LLM stream for dashboard chat
+    app.include_router(assist.router)
 
     @app.get("/health", tags=["health"])
     async def health_check() -> dict[str, str]:
