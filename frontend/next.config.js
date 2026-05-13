@@ -25,7 +25,7 @@ const config = {
     const rewrites = [];
     const langgraphURL = getInternalServiceURL(
       "DEER_FLOW_INTERNAL_LANGGRAPH_BASE_URL",
-      "http://127.0.0.1:2024",
+      "http://127.0.0.1:8001/api",
     );
     const gatewayURL = getInternalServiceURL(
       "DEER_FLOW_INTERNAL_GATEWAY_BASE_URL",
@@ -44,7 +44,7 @@ const config = {
     }
 
     if (!process.env.NEXT_PUBLIC_BACKEND_BASE_URL) {
-      for (const route of ["agents", "skills", "mcp", "memory", "models"]) {
+      for (const route of ["agents", "skills", "mcp", "memory", "models", "tools", "tool-groups"]) {
         rewrites.push({
           source: `/api/${route}`,
           destination: `${gatewayURL}/api/${route}`,
@@ -54,6 +54,22 @@ const config = {
           destination: `${gatewayURL}/api/${route}/:path*`,
         });
       }
+
+      // Auth endpoints — required for browser-side login/setup/register calls
+      rewrites.push({
+        source: "/api/v1/auth/:path*",
+        destination: `${gatewayURL}/api/v1/auth/:path*`,
+      });
+
+      // Threads, runs, feedback, suggestions, uploads, channels
+      rewrites.push({
+        source: "/api/threads/:path*",
+        destination: `${gatewayURL}/api/threads/:path*`,
+      });
+      rewrites.push({
+        source: "/api/runs/:path*",
+        destination: `${gatewayURL}/api/runs/:path*`,
+      });
     }
 
     return rewrites;

@@ -27,6 +27,12 @@ const MODULES = [
     description: "Browse, enable, and install skills that give agents access to specialized workflows.",
     icon: "🔧",
   },
+  {
+    href: "/dashboard/tools",
+    title: "Tools",
+    description: "Add, edit, and remove tools available to agents — edit config.yaml entries from the UI.",
+    icon: "🛠",
+  },
 ] as const;
 
 export default function DashboardPage() {

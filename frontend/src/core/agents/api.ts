@@ -1,3 +1,4 @@
+import { fetch as fetchWithAuth } from "@/core/api/fetcher";
 import { getBackendBaseURL } from "@/core/config";
 import { requireJson } from "@/core/utils/fetch";
 
@@ -12,6 +13,13 @@ export class AgentNameCheckError extends Error {
   ) {
     super(message);
     this.name = "AgentNameCheckError";
+  }
+}
+
+export class AgentsApiDisabledError extends Error {
+  constructor(message = "Agents API is disabled") {
+    super(message);
+    this.name = "AgentsApiDisabledError";
   }
 }
 
@@ -57,7 +65,7 @@ export async function getAgent(name: string): Promise<Agent> {
 }
 
 export async function createAgent(request: CreateAgentRequest): Promise<Agent> {
-  const res = await fetch(`${getBackendBaseURL()}/api/agents`, {
+  const res = await fetchWithAuth(`${getBackendBaseURL()}/api/agents`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -69,7 +77,7 @@ export async function updateAgent(
   name: string,
   request: UpdateAgentRequest,
 ): Promise<Agent> {
-  const res = await fetch(`${getBackendBaseURL()}/api/agents/${name}`, {
+  const res = await fetchWithAuth(`${getBackendBaseURL()}/api/agents/${name}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
@@ -78,7 +86,7 @@ export async function updateAgent(
 }
 
 export async function deleteAgent(name: string): Promise<void> {
-  const res = await fetch(`${getBackendBaseURL()}/api/agents/${name}`, {
+  const res = await fetchWithAuth(`${getBackendBaseURL()}/api/agents/${name}`, {
     method: "DELETE",
   });
   if (!res.ok) throw new Error(`Failed to delete agent: ${res.statusText}`);
@@ -90,7 +98,7 @@ export async function getUserProfile(): Promise<UserProfile> {
 }
 
 export async function updateUserProfile(content: string): Promise<UserProfile> {
-  const res = await fetch(`${getBackendBaseURL()}/api/user-profile`, {
+  const res = await fetchWithAuth(`${getBackendBaseURL()}/api/user-profile`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content }),

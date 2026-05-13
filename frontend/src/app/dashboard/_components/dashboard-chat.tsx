@@ -1,12 +1,11 @@
 "use client";
 
-import { useStream } from "@langchain/langgraph-sdk/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getAPIClient } from "@/core/api";
-import type { AgentThreadState } from "@/core/threads/types";
+import { fetch as fetchWithAuth } from "@/core/api/fetcher";
+import { getBackendBaseURL } from "@/core/config";
 import { cn } from "@/lib/utils";
 
 type Role = "human" | "ai";
@@ -14,19 +13,6 @@ type Role = "human" | "ai";
 interface ChatMessage {
   role: Role;
   text: string;
-}
-
-// Extract text from a LangGraph message content field (string or content-part array)
-function extractText(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content
-    .filter(
-      (p): p is { type: "text"; text: string } =>
-        typeof p === "object" && p !== null && "type" in p && p.type === "text",
-    )
-    .map((p) => p.text)
-    .join("");
 }
 
 // Pull the first fenced code block whose content starts with "---" (YAML frontmatter)
@@ -40,13 +26,39 @@ export function extractSkillMd(text: string): string | null {
   return null;
 }
 
+// Pull the first fenced JSON code block that looks like a tool config (has "name" and "use")
+export function extractToolJson(text: string): Record<string, unknown> | null {
+  const fenceRe = /```(?:json)?\n([\s\S]*?)```/g;
+  let match: RegExpExecArray | null;
+  while ((match = fenceRe.exec(text)) !== null) {
+    const block = match[1]?.trim() ?? "";
+    try {
+      const parsed = JSON.parse(block) as unknown;
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        !Array.isArray(parsed) &&
+        "name" in parsed &&
+        "use" in parsed
+      ) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // not valid JSON — skip
+    }
+  }
+  return null;
+}
+
 interface DashboardChatProps {
   /** Shown as the first assistant bubble to guide the user. */
   greeting?: string;
-  /** If provided, this text is prepended to every user message sent to the agent. */
+  /** If provided, this text is prepended to every user message sent to the LLM. */
   systemHint?: string;
   /** Called whenever an AI response contains a SKILL.md-looking code block. */
   onSkillBlock?: (content: string) => void;
+  /** Called whenever an AI response contains a JSON tool config block. */
+  onToolJson?: (json: Record<string, unknown>) => void;
   className?: string;
   inputPlaceholder?: string;
 }
@@ -55,67 +67,122 @@ export function DashboardChat({
   greeting,
   systemHint,
   onSkillBlock,
+  onToolJson,
   className,
   inputPlaceholder = "Type a message…",
 }: DashboardChatProps) {
-  const [threadId, setThreadId] = useState<string | undefined>(undefined);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const thread = useStream<AgentThreadState>({
-    client: getAPIClient(),
-    assistantId: "lead_agent",
-    threadId,
-    onCreated(meta) {
-      setThreadId(meta.thread_id);
-    },
-  });
-
-  // Derive a clean message list from the stream state
-  const messages: ChatMessage[] = (thread.messages ?? [])
-    .filter((m) => m.type === "human" || m.type === "ai")
-    .filter((m) => {
-      if (m.type !== "ai") return true;
-      const text = extractText(m.content);
-      return text.trim().length > 0;
-    })
-    .map((m) => ({
-      role: m.type as Role,
-      text: extractText(m.content),
-    }));
+  const lastAiText = messages.filter((m) => m.role === "ai").at(-1)?.text ?? "";
 
   // Notify parent whenever the latest AI message has a SKILL.md block
-  const lastAiText = messages.filter((m) => m.role === "ai").at(-1)?.text ?? "";
   useEffect(() => {
     if (!onSkillBlock || !lastAiText) return;
     const block = extractSkillMd(lastAiText);
     if (block) onSkillBlock(block);
   }, [lastAiText, onSkillBlock]);
 
+  // Notify parent whenever the latest AI message has a tool JSON block
+  useEffect(() => {
+    if (!onToolJson || !lastAiText) return;
+    const json = extractToolJson(lastAiText);
+    if (json) onToolJson(json);
+  }, [lastAiText, onToolJson]);
+
   // Auto-scroll to bottom when messages update
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, thread.isLoading]);
+  }, [messages.length, isLoading]);
 
-  function handleSend() {
+  const handleSend = useCallback(async () => {
     const text = input.trim();
-    if (!text || thread.isLoading) return;
+    if (!text || isLoading) return;
     setInput("");
-    const fullText = systemHint ? `${systemHint}\n\n${text}` : text;
-    void thread.submit({
-      messages: [
-        {
-          type: "human",
-          content: [{ type: "text", text: fullText }],
-        },
-      ],
-    });
-  }
+
+    setMessages((prev) => [...prev, { role: "human", text }]);
+    setMessages((prev) => [...prev, { role: "ai", text: "" }]);
+    setIsLoading(true);
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const base = getBackendBaseURL();
+      const res = await fetchWithAuth(`${base}/api/assist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, system_hint: systemHint ?? null }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const err = await res.text().catch(() => res.statusText);
+        throw new Error(err);
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+      let buf = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+
+        // Process complete SSE lines
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6);
+          if (payload === "[DONE]") break;
+          try {
+            const chunk = JSON.parse(payload) as { text?: string; error?: string };
+            if (chunk.error) throw new Error(chunk.error);
+            if (chunk.text) {
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last?.role === "ai") {
+                  updated[updated.length - 1] = { role: "ai", text: last.text + chunk.text };
+                }
+                return updated;
+              });
+            }
+          } catch {
+            // ignore malformed chunks
+          }
+        }
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        const msg = err instanceof Error ? err.message : "Request failed";
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last?.role === "ai" && last.text === "") {
+            updated[updated.length - 1] = { role: "ai", text: `Error: ${msg}` };
+          }
+          return updated;
+        });
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [input, isLoading, systemHint]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      void handleSend();
     }
   }
 
@@ -126,11 +193,8 @@ export function DashboardChat({
           <Bubble role="ai" text={greeting} />
         )}
         {messages.map((m, i) => (
-          <Bubble key={i} role={m.role} text={m.text} />
+          <Bubble key={i} role={m.role} text={m.text} loading={isLoading && i === messages.length - 1 && m.role === "ai" && m.text === ""} />
         ))}
-        {thread.isLoading && messages.at(-1)?.role === "human" && (
-          <Bubble role="ai" text="" loading />
-        )}
         <div ref={bottomRef} />
       </ScrollArea>
 
@@ -143,11 +207,11 @@ export function DashboardChat({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            disabled={thread.isLoading}
+            disabled={isLoading}
           />
           <Button
-            onClick={handleSend}
-            disabled={!input.trim() || thread.isLoading}
+            onClick={() => void handleSend()}
+            disabled={!input.trim() || isLoading}
             className="self-end"
           >
             Send
