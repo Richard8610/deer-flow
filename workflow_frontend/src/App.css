@@ -1,0 +1,143 @@
+/* ── Reset & base ──────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0F172A; color: #F1F5F9; }
+
+/* ── Layout ────────────────────────────────────────────────────────────── */
+.app   { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.layout { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Topbar ────────────────────────────────────────────────────────────── */
+.topbar {
+  height: 44px; display: flex; align-items: center; gap: 12px;
+  padding: 0 16px; background: #1E293B; border-bottom: 1px solid #334155;
+  flex-shrink: 0;
+}
+.topbar__title   { font-weight: 600; font-size: 14px; color: #F1F5F9; }
+.topbar__stats   { display: flex; gap: 6px; font-size: 12px; color: #64748B; margin-left: auto; }
+.topbar__selected code { font-size: 11px; background: #334155; padding: 1px 5px; border-radius: 4px; color: #93C5FD; }
+.topbar__link    { font-size: 12px; color: #64748B; text-decoration: none; }
+.topbar__link:hover { color: #F1F5F9; }
+
+/* ── Sidebar ───────────────────────────────────────────────────────────── */
+.sidebar {
+  width: 240px; flex-shrink: 0; background: #1E293B;
+  border-right: 1px solid #334155; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 0;
+}
+.sidebar__brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 16px; border-bottom: 1px solid #334155;
+}
+.sidebar__logo  { font-size: 22px; }
+.sidebar__name  { font-size: 14px; font-weight: 700; color: #F1F5F9; }
+.sidebar__sub   { font-size: 11px; color: #64748B; }
+
+.sidebar__section { padding: 12px; border-bottom: 1px solid #334155; }
+.sidebar__section--bottom { margin-top: auto; }
+.sidebar__section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #64748B; margin-bottom: 6px; }
+.sidebar__hint  { font-size: 10px; color: #475569; margin-bottom: 8px; }
+
+.sidebar__item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px; border-radius: 6px; cursor: grab; user-select: none;
+  transition: background 0.15s;
+}
+.sidebar__item:hover  { background: #334155; }
+.sidebar__item:active { cursor: grabbing; }
+
+.sidebar__item-dot {
+  width: 32px; height: 32px; border-radius: 8px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+}
+.sidebar__item-name { font-size: 13px; font-weight: 600; color: #E2E8F0; }
+.sidebar__item-desc { font-size: 11px; color: #64748B; margin-top: 1px; }
+
+.sidebar__btn {
+  display: block; width: 100%; text-align: left;
+  padding: 8px 10px; border-radius: 6px; font-size: 13px;
+  background: #334155; color: #E2E8F0;
+  border: none; cursor: pointer; margin-bottom: 6px;
+  transition: background 0.15s;
+}
+.sidebar__btn:hover           { background: #475569; }
+.sidebar__btn--outline        { background: transparent; border: 1px solid #334155; }
+.sidebar__btn--outline:hover  { background: #1E293B; }
+.sidebar__btn--danger         { background: transparent; color: #FCA5A5; border: 1px solid #7F1D1D; }
+.sidebar__btn--danger:hover   { background: #7F1D1D33; }
+
+/* ── Canvas ────────────────────────────────────────────────────────────── */
+.canvas-wrap { flex: 1; overflow: hidden; background: #F1F5F9; }
+
+/* ── Inspector ─────────────────────────────────────────────────────────── */
+.inspector {
+  width: 300px; flex-shrink: 0; background: #1E293B;
+  border-left: 1px solid #334155; overflow-y: auto;
+  padding: 16px; display: flex; flex-direction: column; gap: 12px;
+}
+.inspector--empty {
+  align-items: center; justify-content: center;
+  color: #475569; font-size: 13px; text-align: center;
+}
+
+.insp__header   { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.insp__badge    { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; color: #fff; text-transform: uppercase; letter-spacing: .06em; }
+.insp__id       { font-size: 11px; color: #64748B; font-family: monospace; }
+
+.insp__field    { display: flex; flex-direction: column; gap: 4px; }
+.insp__label    { font-size: 11px; font-weight: 600; color: #94A3B8; text-transform: uppercase; letter-spacing: .06em; }
+
+.insp__input,
+.insp__textarea,
+.insp__select {
+  background: #0F172A; color: #E2E8F0; border: 1px solid #334155;
+  border-radius: 6px; padding: 6px 8px; font-size: 13px;
+  font-family: inherit; outline: none; resize: vertical;
+  transition: border-color 0.15s;
+}
+.insp__input:focus,
+.insp__textarea:focus,
+.insp__select:focus { border-color: #3B82F6; }
+
+/* ── Workflow nodes ────────────────────────────────────────────────────── */
+.wf-node {
+  width: 220px; background: #fff; border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.12); overflow: hidden;
+  border: 1.5px solid #E2E8F0;
+}
+.wf-node.selected, .wf-node:focus-within { border-color: #3B82F6; }
+
+.wf-node__header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px;
+}
+.wf-node__icon  { font-size: 14px; }
+.wf-node__type  { font-size: 11px; font-weight: 700; color: rgba(255,255,255,.9); text-transform: uppercase; letter-spacing: .06em; }
+
+.wf-node__body  { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; }
+.wf-node__label { font-size: 13px; font-weight: 700; color: #0F172A; }
+.wf-node__desc  { font-size: 11px; color: #64748B; line-height: 1.4; }
+
+.wf-node__fields  { margin-top: 4px; display: flex; flex-direction: column; gap: 3px; }
+.wf-node__field-row { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
+.wf-node__field-dir { font-size: 10px; font-weight: 700; color: #94A3B8; width: 20px; flex-shrink: 0; }
+
+.wf-node__chip {
+  font-size: 10px; padding: 1px 5px; border-radius: 4px;
+  font-family: monospace; font-weight: 500;
+}
+.wf-node__chip--in  { background: #DBEAFE; color: #1D4ED8; }
+.wf-node__chip--out { background: #D1FAE5; color: #065F46; }
+
+.wf-node__branches {
+  display: flex; justify-content: space-between;
+  font-size: 11px; font-weight: 600; padding: 2px 0;
+}
+
+/* ── Data-flow edge labels ─────────────────────────────────────────────── */
+.wf-edge-label {
+  position: absolute;
+  background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 4px;
+  font-size: 10px; font-family: monospace; color: #475569;
+  padding: 1px 6px; pointer-events: all; white-space: nowrap;
+}
