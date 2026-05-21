@@ -69,13 +69,26 @@ def list_projects() -> list[str]:
 
 
 def make_workflow_graph() -> StateGraph:
-    """Generic task-decompose → execute → evaluate → synthesize graph (built-in)."""
+    """Generic workflow graph where each subtask becomes its own node.
+
+    After ``plan_workflow``, LangGraph's Send API fans out one ``execute_subtask``
+    node per assignment — they run in parallel and are joined automatically before
+    ``evaluate``.  On retry only the failed subtasks are re-dispatched.
+
+    Shape::
+
+        START → parse_input → decompose → search_skills → plan_workflow
+                  ↘ Send×N ↘                              ↙ Send×M (retry)
+                             execute_subtask ─────────────→ evaluate → synthesize → END
+                                                              ↘ prepare_retry ↗
+    """
     from langgraph.graph import END, START
+    from langgraph.types import Send
 
     from .nodes import (
         decompose_node,
         evaluate_node,
-        execute_node,
+        execute_subtask_node,
         parse_input_node,
         plan_workflow_node,
         prepare_retry_node,
@@ -83,6 +96,20 @@ def make_workflow_graph() -> StateGraph:
         synthesize_node,
     )
     from .state import WorkflowState
+
+    def _route_subtasks(state):
+        """Return one Send per assignment, or fall through to evaluate when empty."""
+        assignments = state.get("subagent_assignments") or []
+        if not assignments:
+            return "evaluate"
+        return [
+            Send("execute_subtask", {
+                "subtask_id": a.get("subtask_id", str(i)),
+                "prompt": a.get("prompt", ""),
+                "subagent_type": a.get("subagent_type", "general-purpose"),
+            })
+            for i, a in enumerate(assignments)
+        ]
 
     def _should_retry(state) -> str:
         if state.get("all_passed", True):
@@ -96,7 +123,7 @@ def make_workflow_graph() -> StateGraph:
     builder.add_node("decompose", decompose_node)
     builder.add_node("search_skills", search_skills_node)
     builder.add_node("plan_workflow", plan_workflow_node)
-    builder.add_node("execute", execute_node)
+    builder.add_node("execute_subtask", execute_subtask_node)
     builder.add_node("evaluate", evaluate_node)
     builder.add_node("prepare_retry", prepare_retry_node)
     builder.add_node("synthesize", synthesize_node)
@@ -105,10 +132,10 @@ def make_workflow_graph() -> StateGraph:
     builder.add_edge("parse_input", "decompose")
     builder.add_edge("decompose", "search_skills")
     builder.add_edge("search_skills", "plan_workflow")
-    builder.add_edge("plan_workflow", "execute")
-    builder.add_edge("execute", "evaluate")
+    builder.add_conditional_edges("plan_workflow", _route_subtasks, ["execute_subtask", "evaluate"])
+    builder.add_edge("execute_subtask", "evaluate")
     builder.add_conditional_edges("evaluate", _should_retry, {"prepare_retry": "prepare_retry", "synthesize": "synthesize"})
-    builder.add_edge("prepare_retry", "execute")
+    builder.add_conditional_edges("prepare_retry", _route_subtasks, ["execute_subtask", "evaluate"])
     builder.add_edge("synthesize", END)
     return builder
 

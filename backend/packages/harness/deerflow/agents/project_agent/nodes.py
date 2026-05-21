@@ -197,11 +197,61 @@ async def execute_node(state: WorkflowState, config: RunnableConfig) -> dict:
     return {"execution_results": results}
 
 
+async def execute_subtask_node(state: dict) -> dict:
+    """Run a single subagent for one assignment. Invoked per-subtask via Send.
+
+    *state* contains only the keys passed by the Send routing function:
+    ``subtask_id``, ``prompt``, ``subagent_type``.
+    The result is appended to ``WorkflowState.execution_results`` via its
+    ``operator.add`` reducer.
+    """
+    from deerflow.tools import get_available_tools
+
+    subtask_id = state.get("subtask_id", "unknown")
+    prompt = state.get("prompt", "No task specified")
+    subagent_type = state.get("subagent_type", "general-purpose")
+
+    app_config = get_app_config()
+    tools = get_available_tools(app_config=app_config)
+
+    sub_cfg = get_subagent_config(subagent_type, app_config=app_config) or get_subagent_config("general-purpose", app_config=app_config)
+    if sub_cfg is None:
+        logger.error("No config for subagent type '%s'", subagent_type)
+        return {"execution_results": [{"subtask_id": subtask_id, "status": "failed", "result": "", "error": f"Unknown subagent type: {subagent_type}"}]}
+
+    executor = SubagentExecutor(config=sub_cfg, tools=tools, app_config=app_config, thread_id=str(uuid.uuid4()))
+    task_id = executor.execute_async(prompt)
+    logger.info("Started subagent %s → subtask %s", task_id, subtask_id)
+
+    polls = 0
+    while polls < _MAX_POLL_COUNT:
+        await asyncio.sleep(_POLL_INTERVAL_SECONDS)
+        polls += 1
+        bg = get_background_task_result(task_id)
+        if bg is not None and bg.status.is_terminal:
+            cleanup_background_task(task_id)
+            logger.info("Subtask %s finished: %s", subtask_id, bg.status.value)
+            return {"execution_results": [{"subtask_id": subtask_id, "status": bg.status.value, "result": bg.result or "", "error": bg.error}]}
+
+    cleanup_background_task(task_id)
+    return {"execution_results": [{"subtask_id": subtask_id, "status": "timed_out", "result": "", "error": "Polling timeout exceeded"}]}
+
+
+def _latest_results(state: WorkflowState) -> list[dict]:
+    """Deduplicate execution_results keeping the last entry per subtask_id (handles retries)."""
+    seen: dict[str, dict] = {}
+    for r in state.get("execution_results") or []:
+        seen[r["subtask_id"]] = r
+    return list(seen.values())
+
+
 async def evaluate_node(state: WorkflowState, config: RunnableConfig) -> dict:
     model = create_chat_model(thinking_enabled=False, app_config=get_app_config())
     subtasks = {st["id"]: st for st in (state.get("subtasks") or [])}
+    results = _latest_results(state)
+
     items = []
-    for r in state.get("execution_results") or []:
+    for r in results:
         desc = subtasks.get(r["subtask_id"], {}).get("description", "Unknown")
         items.append(f"Subtask {r['subtask_id']} — {desc}\nStatus: {r['status']}\nResult (first 600 chars):\n{r['result'][:600]}")
 
@@ -217,7 +267,7 @@ async def evaluate_node(state: WorkflowState, config: RunnableConfig) -> dict:
     if not isinstance(evaluations, list) or not evaluations:
         evaluations = [
             {"subtask_id": r["subtask_id"], "passed": r["status"] == SubagentStatus.COMPLETED.value, "score": 0.8 if r["status"] == SubagentStatus.COMPLETED.value else 0.0, "feedback": r.get("error") or "auto-evaluated"}
-            for r in (state.get("execution_results") or [])
+            for r in results
         ]
 
     all_passed = all(ev.get("passed", False) for ev in evaluations)
@@ -228,26 +278,27 @@ async def evaluate_node(state: WorkflowState, config: RunnableConfig) -> dict:
 async def prepare_retry_node(state: WorkflowState) -> dict:
     failed_ids = {ev["subtask_id"] for ev in (state.get("evaluation_results") or []) if not ev.get("passed", False)}
     failed_assignments = [a for a in (state.get("subagent_assignments") or []) if a.get("subtask_id") in failed_ids]
-    successful_results = [r for r in (state.get("execution_results") or []) if r.get("subtask_id") not in failed_ids]
+    # execution_results is NOT reset — retried results are appended by the add reducer
+    # and _latest_results() deduplicates by keeping the newest entry per subtask_id.
     return {
         "retry_count": (state.get("retry_count") or 0) + 1,
         "subagent_assignments": failed_assignments,
-        "execution_results": successful_results,
     }
 
 
 async def synthesize_node(state: WorkflowState, config: RunnableConfig) -> dict:
     model = create_chat_model(thinking_enabled=False, app_config=get_app_config())
-    summaries = []
+    results = _latest_results(state)
     eval_map = {ev["subtask_id"]: ev for ev in (state.get("evaluation_results") or [])}
-    for r in state.get("execution_results") or []:
-        ev = eval_map.get(r["subtask_id"], {})
-        summaries.append(f"Subtask {r['subtask_id']} ({r['status']}):\n{r['result'][:800]}\nEvaluation: {ev.get('feedback', 'N/A')}")
+    summaries = [
+        f"Subtask {r['subtask_id']} ({r['status']}):\n{r['result'][:800]}\nEvaluation: {eval_map.get(r['subtask_id'], {}).get('feedback', 'N/A')}"
+        for r in results
+    ]
 
     context = "\n".join([
         f"Original task: {state.get('task_description', '')}",
         f"Project directory: {state.get('project_dir') or 'not created'}",
-        f"Subtasks executed: {len(state.get('execution_results') or [])}",
+        f"Subtasks executed: {len(results)}",
         "\nResults:\n" + "\n\n".join(summaries),
     ])
 
