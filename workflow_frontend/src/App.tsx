@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Canvas } from './components/Canvas';
 import { Inspector } from './components/Inspector';
@@ -102,11 +103,19 @@ export default function App() {
           </span>
         )}
 
-        <button
-          className={`topbar__chat-btn${showChat ? ' topbar__chat-btn--active' : ''}`}
-          onClick={() => setShowChat((v) => !v)}
+        <Link
+          to={activeProject ? `/chat?project=${encodeURIComponent(activeProject)}` : '/chat'}
+          className="topbar__chat-btn"
         >
           💬 Chat
+        </Link>
+
+        <button
+          className={`topbar__agent-btn${showChat ? ' topbar__agent-btn--active' : ''}`}
+          onClick={() => setShowChat((v) => !v)}
+          title="Toggle agent sidebar"
+        >
+          🤖 Agent
         </button>
 
         <div className="topbar__stats">
