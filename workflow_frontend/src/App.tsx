@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Canvas } from './components/Canvas';
 import { Inspector } from './components/Inspector';
+import { ChatPanel } from './components/ChatPanel';
 import { useWorkflow } from './store/useWorkflow';
 import { APP } from './workflow.config';
 import { fetchProjects, fetchWorkflow, saveWorkflow } from './api';
@@ -15,6 +15,7 @@ export default function App() {
   const [projects, setProjects]           = useState<string[]>([]);
   const [activeProject, setActiveProject] = useState('');
   const [saveStatus, setSaveStatus]       = useState<SaveStatus>('idle');
+  const [showChat, setShowChat]           = useState(false);
 
   const saveTimer        = useRef<ReturnType<typeof setTimeout>>();
   const activeProjectRef = useRef('');
@@ -74,8 +75,6 @@ export default function App() {
     return () => clearTimeout(saveTimer.current);
   }, [nodes, edges]);
 
-  // Chat link carries the active project so the chat page pre-selects it
-  const chatHref = activeProject ? `/chat?project=${encodeURIComponent(activeProject)}` : '/chat';
 
   return (
     <div className="app">
@@ -103,9 +102,12 @@ export default function App() {
           </span>
         )}
 
-        <Link to={chatHref} className="topbar__chat-btn">
+        <button
+          className={`topbar__chat-btn${showChat ? ' topbar__chat-btn--active' : ''}`}
+          onClick={() => setShowChat((v) => !v)}
+        >
           💬 Chat
-        </Link>
+        </button>
 
         <div className="topbar__stats">
           <span>{nodes.length} nodes</span>
@@ -132,6 +134,7 @@ export default function App() {
           <Canvas />
         </main>
         <Inspector />
+        {showChat && <ChatPanel activeProject={activeProject} />}
       </div>
     </div>
   );

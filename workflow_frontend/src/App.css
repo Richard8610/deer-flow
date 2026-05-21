@@ -29,6 +29,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   padding: 3px 10px; border-radius: 6px; font-size: 12px;
   background: transparent; border: 1px solid #334155; color: #94A3B8;
   cursor: pointer; transition: background 0.15s, color 0.15s;
+  font-family: inherit; text-decoration: none;
 }
 .topbar__chat-btn:hover           { background: #334155; color: #E2E8F0; }
 .topbar__chat-btn--active         { background: #1D4ED8; border-color: #1D4ED8; color: #fff; }
@@ -165,7 +166,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 /* ── Chat panel ────────────────────────────────────────────────────────── */
 .chat-panel {
   width: 360px; flex-shrink: 0; background: #1E293B;
-  border-right: 1px solid #334155;
+  border-left: 1px solid #334155;
   display: flex; flex-direction: column; overflow: hidden;
 }
 
