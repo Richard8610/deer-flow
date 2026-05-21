@@ -7,8 +7,8 @@
   "env": ".env",
   "graphs": {
     "lead_agent": "deerflow.agents:make_lead_agent",
-    "workflow_agent": "deerflow.agents.workflow_agent:make_workflow_agent",
-    "competitive_analysis_agent": "deerflow.agents.workflow_agent:make_competitive_analysis_agent"
+    "project_agent": "deerflow.agents.project_agent:make_workflow_agent",
+    "competitive_analysis_agent": "deerflow.agents.project_agent:make_competitive_analysis_agent"
   },
   "auth": {
     "path": "./app/gateway/langgraph_auth.py:auth"

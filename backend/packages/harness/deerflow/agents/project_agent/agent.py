@@ -1,8 +1,8 @@
-"""LangGraph entry-point factories for the workflow agent system.
+"""LangGraph entry-point factories for the project agent system.
 
 Registered graphs (langgraph.json):
-  - ``workflow_agent``              → make_workflow_agent
-  - ``competitive_analysis_agent``  → make_competitive_analysis_agent
+  - ``project_agent``              → make_workflow_agent
+  - ``competitive_analysis_agent`` → make_competitive_analysis_agent
 
 Dynamic use:
   - ``make_project_agent(project_name, config)`` loads any project in projects/.
@@ -56,5 +56,4 @@ def make_project_agent(project_name: str, config: RunnableConfig):
         logger.warning("No graph found for project '%s'; falling back to generic workflow", project_name)
         return make_workflow_graph().compile()
     result = factory()
-    # factory may return a StateGraph builder or an already-compiled graph
     return result.compile() if hasattr(result, "compile") else result

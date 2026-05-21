@@ -3,7 +3,7 @@
 Project-specific nodes (research, report generation, saving) live in
 src/graphs/competitive_analysis.py inline.
 """
-from deerflow.agents.workflow_agent.nodes import (  # noqa: F401
+from deerflow.agents.project_agent.nodes import (  # noqa: F401
     _last_human_text,
     _parse_json_safe,
     _run_subagents_parallel,

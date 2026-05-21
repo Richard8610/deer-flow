@@ -23,7 +23,7 @@ projects/{project_name}/
 
 ## Creating a New Workflow Project
 
-Use the **Workflow Agent** (registered as `workflow_agent` in LangGraph):
+Use the **Workflow Agent** (registered as `project_agent` in LangGraph):
 
 1. Start a conversation with the workflow agent
 2. Describe your task or goal

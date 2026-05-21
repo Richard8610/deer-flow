@@ -1,4 +1,4 @@
-"""Workflow agent package.
+"""Project agent package — general-purpose project loader.
 
 Registered LangGraph graphs:
 - ``make_workflow_agent``             — generic decompose/execute/evaluate pipeline
@@ -11,9 +11,9 @@ from .agent import make_competitive_analysis_agent, make_project_agent, make_wor
 from .graph import load_project_graph, make_project_graph, make_workflow_graph
 
 __all__ = [
+    "make_workflow_agent",
     "make_competitive_analysis_agent",
     "make_project_agent",
-    "make_workflow_agent",
     "load_project_graph",
     "make_project_graph",
     "make_workflow_graph",
