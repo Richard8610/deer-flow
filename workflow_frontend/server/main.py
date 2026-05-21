@@ -47,7 +47,7 @@ async def _gateway() -> httpx.AsyncClient:
     if _gw_client is not None:
         return _gw_client
 
-    _gw_client = httpx.AsyncClient(follow_redirects=True, timeout=300.0)
+    _gw_client = httpx.AsyncClient(follow_redirects=True, timeout=300.0, trust_env=False)
     try:
         r = await _gw_client.post(
             f"{GW_BASE}/api/v1/auth/login/local",
