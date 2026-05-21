@@ -113,8 +113,14 @@ def make_workflow_graph() -> StateGraph:
     return builder
 
 
-def make_competitive_analysis_graph() -> StateGraph:
-    """Convenience wrapper for the competitive analysis graph."""
-    from competitive_analysis.src.graphs.competitive_analysis import make_competitive_analysis_graph as _impl
+def make_project_graph(project_name: str) -> StateGraph:
+    """Load and return the graph builder for any named project.
 
-    return _impl()
+    Uses ``load_project_graph`` for discovery; falls back to
+    ``make_workflow_graph()`` when the project has no custom graph.
+    """
+    factory = load_project_graph(project_name)
+    if factory is None:
+        logger.warning("No graph found for project '%s'; using generic workflow", project_name)
+        return make_workflow_graph()
+    return factory()

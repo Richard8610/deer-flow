@@ -33,9 +33,7 @@ def make_workflow_agent(config: RunnableConfig):
 
 def make_competitive_analysis_agent(config: RunnableConfig):
     """Competitive analysis agent: company name → parallel research → structured report."""
-    from competitive_analysis.src.agent import make_competitive_analysis_agent as _make
-
-    return _make(config)
+    return make_project_agent("competitive_analysis", config)
 
 
 def make_project_agent(project_name: str, config: RunnableConfig):
