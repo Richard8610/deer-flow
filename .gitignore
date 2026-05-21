@@ -36,7 +36,8 @@ extensions_config.json
 coverage.xml
 coverage/
 .deer-flow/
-.claude/
+.claude/*
+!.claude/commands/
 skills/custom/*
 logs/
 log/
