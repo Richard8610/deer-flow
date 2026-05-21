@@ -1,33 +1,69 @@
 """
-Workflow persistence server.
+Workflow persistence + chat proxy server.
 
 Run from workflow_frontend/:
     uvicorn server.main:app --port 8002 --reload
 
+Environment variables:
+    DEERFLOW_URL       DeerFlow gateway base URL (default: http://localhost:8001)
+    DEERFLOW_EMAIL     Login email for gateway auth  (default: admin@deerflow.ai)
+    DEERFLOW_PASSWORD  Login password                (default: admin)
+
 Reads / writes  ./projects/{name}/workflow.json  relative to the repo root.
 """
 
+import os
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
-# repo root is three levels up from this file
 PROJECTS_DIR = (Path(__file__).parent.parent.parent / "projects").resolve()
 WORKFLOW_FILE = "workflow.json"
 
-app = FastAPI(title="Workflow Persistence API", version="0.1.0")
+GW_BASE = os.getenv("DEERFLOW_URL", "http://localhost:8001")
+GW_EMAIL = os.getenv("DEERFLOW_EMAIL", "admin@deerflow.ai")
+GW_PASSWORD = os.getenv("DEERFLOW_PASSWORD", "admin")
+
+app = FastAPI(title="Workflow Dev Server", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET", "PUT"],
+    allow_methods=["GET", "PUT", "POST"],
     allow_headers=["*"],
 )
 
+# ── Gateway client (shared, persists cookies) ──────────────────────────────
+
+_gw_client: httpx.AsyncClient | None = None
+
+
+async def _gateway() -> httpx.AsyncClient:
+    """Return an authenticated httpx client for the DeerFlow gateway."""
+    global _gw_client
+    if _gw_client is not None:
+        return _gw_client
+
+    _gw_client = httpx.AsyncClient(follow_redirects=True, timeout=300.0)
+    try:
+        r = await _gw_client.post(
+            f"{GW_BASE}/api/v1/auth/login/local",
+            json={"email": GW_EMAIL, "password": GW_PASSWORD},
+        )
+        r.raise_for_status()
+        print(f"[chat] authenticated with gateway as {GW_EMAIL}")
+    except Exception as exc:
+        print(f"[chat] warning — gateway auth failed: {exc}")
+    return _gw_client
+
+
+# ── Workflow persistence ────────────────────────────────────────────────────
+
 
 def _project_path(name: str) -> Path:
-    # Guard against path traversal
     resolved = (PROJECTS_DIR / name).resolve()
     if not resolved.is_relative_to(PROJECTS_DIR):
         raise HTTPException(status_code=400, detail="Invalid project name")
@@ -38,7 +74,6 @@ def _project_path(name: str) -> Path:
 
 @app.get("/api/workflow/projects")
 def list_projects() -> dict[str, list[str]]:
-    """Return project directory names that contain a src/ subfolder."""
     if not PROJECTS_DIR.exists():
         return {"projects": []}
     names = sorted(
@@ -51,7 +86,6 @@ def list_projects() -> dict[str, list[str]]:
 
 @app.get("/api/workflow/projects/{name}")
 def get_workflow(name: str) -> dict[str, Any]:
-    """Return the saved workflow JSON, or an empty canvas if none exists yet."""
     project = _project_path(name)
     wf_file = project / WORKFLOW_FILE
     if wf_file.exists():
@@ -62,9 +96,49 @@ def get_workflow(name: str) -> dict[str, Any]:
 
 @app.put("/api/workflow/projects/{name}")
 def save_workflow(name: str, body: dict[str, Any]) -> dict[str, Any]:
-    """Persist workflow JSON to projects/{name}/workflow.json."""
     import json
     project = _project_path(name)
     wf_file = project / WORKFLOW_FILE
     wf_file.write_text(json.dumps(body, indent=2, ensure_ascii=False), encoding="utf-8")
     return {"ok": True, "path": str(wf_file.relative_to(PROJECTS_DIR.parent))}
+
+
+# ── Chat proxy ─────────────────────────────────────────────────────────────
+
+
+@app.post("/api/chat/stream")
+async def chat_stream(body: dict[str, Any]) -> StreamingResponse:
+    """
+    Proxy a streaming chat request to the DeerFlow project_agent.
+
+    Body:
+      messages: [{"role": "user"|"assistant", "content": "..."}]
+      project:  optional project name — used to select the agent
+                (e.g. "competitive_analysis" → "competitive_analysis_agent")
+    """
+    messages: list[dict] = body.get("messages", [])
+    project: str = body.get("project", "")
+    assistant_id = f"{project}_agent" if project else "project_agent"
+
+    client = await _gateway()
+
+    async def _stream():
+        try:
+            async with client.stream(
+                "POST",
+                f"{GW_BASE}/api/runs/stream",
+                json={
+                    "assistant_id": assistant_id,
+                    "input": {"messages": messages},
+                    "stream_mode": ["messages-tuple"],
+                    "on_completion": "delete",
+                },
+            ) as resp:
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+        except Exception as exc:
+            # Yield an SSE error event so the frontend can display it
+            import json as _json
+            yield f"event: error\ndata: {_json.dumps(str(exc))}\n\n".encode()
+
+    return StreamingResponse(_stream(), media_type="text/event-stream")
