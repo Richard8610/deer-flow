@@ -1,0 +1,1 @@
+"""Source root for the competitive analysis project."""

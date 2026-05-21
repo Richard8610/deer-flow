@@ -1,0 +1,263 @@
+"""Generic workflow-agent node functions (decompose → plan → execute → evaluate → synthesize)."""
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import re
+import uuid
+from pathlib import Path
+
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
+
+from .prompts import DECOMPOSE_PROMPT, EVALUATE_PROMPT, PLAN_PROMPT, SYNTHESIZE_PROMPT
+from .state import WorkflowState
+
+logger = logging.getLogger(__name__)
+
+_PROJECT_SUBDIRS = ["assets", "config", "scripts", "src/agents", "src/graphs", "src/storage", "src/tools", "src/utils"]
+_POLL_INTERVAL_SECONDS = 5
+_MAX_POLL_COUNT = 180  # 15-minute ceiling
+
+
+# ── Utilities ──────────────────────────────────────────────────────────────
+
+
+def _extract_json(text: str) -> str | None:
+    for pattern in (r"\[[\s\S]*\]", r"\{[\s\S]*\}"):
+        m = re.search(pattern, text)
+        if m:
+            return m.group()
+    return None
+
+
+def _parse_json_safe(text: str, default):
+    for candidate in (text.strip(), _extract_json(text)):
+        if not candidate:
+            continue
+        try:
+            return json.loads(candidate)
+        except (json.JSONDecodeError, TypeError):
+            continue
+    logger.warning("JSON parse failed; raw snippet: %.200s", text)
+    return default
+
+
+def _last_human_text(messages: list) -> str:
+    for msg in reversed(messages):
+        if isinstance(msg, HumanMessage):
+            content = msg.content
+            if isinstance(content, str):
+                return content
+            if isinstance(content, list):
+                return " ".join(b.get("text", "") if isinstance(b, dict) else str(b) for b in content)
+    return ""
+
+
+async def _run_subagents_parallel(assignments: list[dict]) -> list[dict]:
+    """Start all subagent assignments and poll until every one completes."""
+    from deerflow.config import get_app_config
+    from deerflow.subagents import SubagentExecutor, get_subagent_config
+    from deerflow.subagents.executor import SubagentStatus, cleanup_background_task, get_background_task_result
+    from deerflow.tools import get_available_tools
+
+    app_config = get_app_config()
+    tools = get_available_tools(app_config=app_config)
+
+    running: list[tuple[str, str]] = []
+    for assignment in assignments:
+        subagent_type = assignment.get("subagent_type", "general-purpose")
+        sub_cfg = get_subagent_config(subagent_type, app_config=app_config) or get_subagent_config("general-purpose", app_config=app_config)
+        if sub_cfg is None:
+            logger.error("No config found for subagent type '%s'", subagent_type)
+            continue
+        executor = SubagentExecutor(config=sub_cfg, tools=tools, app_config=app_config, thread_id=str(uuid.uuid4()))
+        task_id = executor.execute_async(assignment.get("prompt", "No task specified"))
+        running.append((assignment.get("subtask_id", "unknown"), task_id))
+        logger.info("Started subagent task %s for subtask %s", task_id, assignment.get("subtask_id"))
+
+    results: list[dict] = []
+    pending = list(running)
+    polls = 0
+
+    while pending and polls < _MAX_POLL_COUNT:
+        await asyncio.sleep(_POLL_INTERVAL_SECONDS)
+        polls += 1
+        still_pending = []
+        for subtask_id, task_id in pending:
+            bg = get_background_task_result(task_id)
+            if bg is not None and bg.status.is_terminal:
+                results.append({"subtask_id": subtask_id, "status": bg.status.value, "result": bg.result or "", "error": bg.error})
+                cleanup_background_task(task_id)
+                logger.info("Subtask %s completed with status %s", subtask_id, bg.status.value)
+            else:
+                still_pending.append((subtask_id, task_id))
+        pending = still_pending
+
+    for subtask_id, task_id in pending:
+        results.append({"subtask_id": subtask_id, "status": "timed_out", "result": "", "error": "Polling timeout exceeded"})
+        cleanup_background_task(task_id)
+
+    return results
+
+
+# ── Node functions ─────────────────────────────────────────────────────────
+
+
+async def parse_input_node(state: WorkflowState) -> dict:
+    task_description = _last_human_text(state.get("messages", []))
+    return {"task_description": task_description or "No task provided"}
+
+
+async def decompose_node(state: WorkflowState, config: RunnableConfig) -> dict:
+    from deerflow.config import get_app_config
+    from deerflow.models import create_chat_model
+
+    model = create_chat_model(thinking_enabled=False, app_config=get_app_config())
+    response = await model.ainvoke([
+        SystemMessage(content=DECOMPOSE_PROMPT),
+        HumanMessage(content=f"Task:\n{state.get('task_description', '')}"),
+    ])
+    content = response.content if isinstance(response.content, str) else str(response.content)
+    subtasks = _parse_json_safe(content, [])
+    if not isinstance(subtasks, list) or not subtasks:
+        subtasks = [{"id": "1", "description": state.get("task_description", ""), "required_tools": ["bash", "write_file"], "subagent_type": "general-purpose", "priority": 1}]
+    logger.info("Decomposed into %d subtasks", len(subtasks))
+    return {"subtasks": subtasks}
+
+
+async def search_skills_node(state: WorkflowState) -> dict:
+    try:
+        from deerflow.skills.storage import get_or_new_skill_storage
+
+        skills = list(get_or_new_skill_storage().load_skills(enabled_only=True))
+        names = [s.name for s in skills]
+        logger.info("Found %d enabled skills", len(names))
+        return {"available_skills": names}
+    except Exception:
+        logger.exception("Failed to load skills")
+        return {"available_skills": []}
+
+
+async def plan_workflow_node(state: WorkflowState, config: RunnableConfig) -> dict:
+    from deerflow.config import get_app_config
+    from deerflow.models import create_chat_model
+
+    model = create_chat_model(thinking_enabled=False, app_config=get_app_config())
+    skills_ctx = ""
+    if state.get("available_skills"):
+        skills_ctx = f"\nAvailable skills: {', '.join(state['available_skills'])}"
+
+    response = await model.ainvoke([
+        SystemMessage(content=PLAN_PROMPT),
+        HumanMessage(content=f"Task: {state.get('task_description', '')}{skills_ctx}\n\nSubtasks:\n{json.dumps(state.get('subtasks', []), indent=2)}"),
+    ])
+    content = response.content if isinstance(response.content, str) else str(response.content)
+    plan = _parse_json_safe(content, {})
+    if not isinstance(plan, dict):
+        plan = {}
+
+    assignments = plan.get("assignments") or [
+        {"subtask_id": st["id"], "subagent_type": st.get("subagent_type", "general-purpose"), "prompt": st["description"]}
+        for st in state.get("subtasks", [])
+    ]
+
+    project_name = plan.get("project_name") or "workflow_project"
+    project_dir = _scaffold_project(project_name, plan.get("description", ""))
+    return {"subagent_assignments": assignments, "project_dir": project_dir}
+
+
+def _scaffold_project(project_name: str, description: str) -> str | None:
+    try:
+        from deerflow.config.paths import get_paths
+
+        base = get_paths().base_dir / "projects" / project_name
+        base.mkdir(parents=True, exist_ok=True)
+        for sub in _PROJECT_SUBDIRS:
+            (base / sub).mkdir(parents=True, exist_ok=True)
+        for src_sub in ["src", "src/agents", "src/graphs", "src/storage", "src/tools", "src/utils"]:
+            init = base / src_sub / "__init__.py"
+            if not init.exists():
+                init.write_text("")
+        readme = base / "README.md"
+        if not readme.exists():
+            readme.write_text(f"# {project_name}\n\n{description}\n\nGenerated by DeerFlow Workflow Agent.\n")
+        (base / "config" / "workflow.yaml").write_text(f"project_name: {project_name}\n")
+        logger.info("Scaffolded project at %s", base)
+        return str(base)
+    except Exception:
+        logger.exception("Failed to scaffold project directory")
+        return None
+
+
+async def execute_node(state: WorkflowState, config: RunnableConfig) -> dict:
+    assignments = state.get("subagent_assignments") or []
+    results = await _run_subagents_parallel(assignments)
+    return {"execution_results": results}
+
+
+async def evaluate_node(state: WorkflowState, config: RunnableConfig) -> dict:
+    from deerflow.config import get_app_config
+    from deerflow.models import create_chat_model
+    from deerflow.subagents.executor import SubagentStatus
+
+    model = create_chat_model(thinking_enabled=False, app_config=get_app_config())
+    subtasks = {st["id"]: st for st in (state.get("subtasks") or [])}
+    items = []
+    for r in state.get("execution_results") or []:
+        desc = subtasks.get(r["subtask_id"], {}).get("description", "Unknown")
+        items.append(f"Subtask {r['subtask_id']} — {desc}\nStatus: {r['status']}\nResult (first 600 chars):\n{r['result'][:600]}")
+
+    if not items:
+        return {"evaluation_results": [], "all_passed": True}
+
+    response = await model.ainvoke([
+        SystemMessage(content=EVALUATE_PROMPT),
+        HumanMessage(content=f"Original task: {state.get('task_description', '')}\n\n" + "\n\n---\n\n".join(items)),
+    ])
+    content = response.content if isinstance(response.content, str) else str(response.content)
+    evaluations = _parse_json_safe(content, [])
+    if not isinstance(evaluations, list) or not evaluations:
+        evaluations = [
+            {"subtask_id": r["subtask_id"], "passed": r["status"] == SubagentStatus.COMPLETED.value, "score": 0.8 if r["status"] == SubagentStatus.COMPLETED.value else 0.0, "feedback": r.get("error") or "auto-evaluated"}
+            for r in (state.get("execution_results") or [])
+        ]
+
+    all_passed = all(ev.get("passed", False) for ev in evaluations)
+    logger.info("Evaluation: %d results, all_passed=%s", len(evaluations), all_passed)
+    return {"evaluation_results": evaluations, "all_passed": all_passed}
+
+
+async def prepare_retry_node(state: WorkflowState) -> dict:
+    failed_ids = {ev["subtask_id"] for ev in (state.get("evaluation_results") or []) if not ev.get("passed", False)}
+    failed_assignments = [a for a in (state.get("subagent_assignments") or []) if a.get("subtask_id") in failed_ids]
+    successful_results = [r for r in (state.get("execution_results") or []) if r.get("subtask_id") not in failed_ids]
+    return {
+        "retry_count": (state.get("retry_count") or 0) + 1,
+        "subagent_assignments": failed_assignments,
+        "execution_results": successful_results,
+    }
+
+
+async def synthesize_node(state: WorkflowState, config: RunnableConfig) -> dict:
+    from deerflow.config import get_app_config
+    from deerflow.models import create_chat_model
+
+    model = create_chat_model(thinking_enabled=False, app_config=get_app_config())
+    summaries = []
+    eval_map = {ev["subtask_id"]: ev for ev in (state.get("evaluation_results") or [])}
+    for r in state.get("execution_results") or []:
+        ev = eval_map.get(r["subtask_id"], {})
+        summaries.append(f"Subtask {r['subtask_id']} ({r['status']}):\n{r['result'][:800]}\nEvaluation: {ev.get('feedback', 'N/A')}")
+
+    context = "\n".join([
+        f"Original task: {state.get('task_description', '')}",
+        f"Project directory: {state.get('project_dir') or 'not created'}",
+        f"Subtasks executed: {len(state.get('execution_results') or [])}",
+        "\nResults:\n" + "\n\n".join(summaries),
+    ])
+
+    response = await model.ainvoke([SystemMessage(content=SYNTHESIZE_PROMPT), HumanMessage(content=context)])
+    final_output = response.content if isinstance(response.content, str) else str(response.content)
+    return {"final_output": final_output, "messages": [AIMessage(content=final_output)]}

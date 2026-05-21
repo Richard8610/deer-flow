@@ -1,0 +1,23 @@
+project_name: competitive_analysis
+version: "1.0.0"
+description: "Company input → parallel web research → professional Chinese-language report"
+
+workflow:
+  research_timeout_seconds: 300   # per subagent
+  poll_interval_seconds: 5
+  max_polls: 180                  # 15-minute ceiling
+
+subagents:
+  researcher:
+    type: general-purpose
+    max_turns: 25
+    timeout_seconds: 300
+    # tools: null means inherit all available tools (web_search, web_fetch, bash, etc.)
+    tools: null
+    disallowed_tools: [task]
+
+report:
+  language: zh_CN
+  min_chars: 1500
+  output_dir: null  # null → {DEER_FLOW_HOME}/projects/competitive_analysis/
+  filename_pattern: "{company}_{date}_竞品分析.md"

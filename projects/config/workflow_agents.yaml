@@ -1,0 +1,28 @@
+## Workflow Agent Configurations
+# These mirror the custom_agents section in config.yaml
+# Copy entries you need into your project's config.yaml under subagents.custom_agents
+
+custom_agents:
+  competitive-analysis-researcher:
+    description: "Research one aspect of a company's competitive landscape"
+    system_prompt: |
+      You are a competitive intelligence analyst. Your job is to research and
+      synthesize information from web searches into clear, factual summaries.
+      Always cite your sources and note when data is unavailable.
+    tools: null          # inherit all available tools
+    disallowed_tools: [task]
+    model: inherit
+    max_turns: 20
+    timeout_seconds: 300
+
+  report-writer:
+    description: "Synthesize research findings into a professional report"
+    system_prompt: |
+      You are a senior strategy consultant. You write professional, fact-based
+      reports in Chinese. Every claim must come from provided research data.
+      Follow McKinsey/BCG consulting standards.
+    tools: [write_file, read_file, bash]
+    disallowed_tools: [task, web_search, web_fetch]
+    model: inherit
+    max_turns: 10
+    timeout_seconds: 120

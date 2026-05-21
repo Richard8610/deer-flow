@@ -1,0 +1,17 @@
+project_name: "my_workflow_project"
+description: "One sentence description"
+version: "0.1.0"
+
+# Workflow configuration
+workflow:
+  max_retries: 2
+  timeout_seconds: 900
+  parallel_subagents: 3
+
+# Subagent types to use
+subagents:
+  default: general-purpose
+  # Available: general-purpose, bash
+
+# Skills to load (null = all enabled skills)
+skills: null
