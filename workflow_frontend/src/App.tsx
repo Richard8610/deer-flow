@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Canvas } from './components/Canvas';
 import { Inspector } from './components/Inspector';
-import { ChatPanel } from './components/ChatPanel';
 import { useWorkflow } from './store/useWorkflow';
 import { APP } from './workflow.config';
 import { fetchProjects, fetchWorkflow, saveWorkflow } from './api';
@@ -15,7 +15,6 @@ export default function App() {
   const [projects, setProjects]           = useState<string[]>([]);
   const [activeProject, setActiveProject] = useState('');
   const [saveStatus, setSaveStatus]       = useState<SaveStatus>('idle');
-  const [showChat, setShowChat]           = useState(false);
 
   const saveTimer        = useRef<ReturnType<typeof setTimeout>>();
   const activeProjectRef = useRef('');
@@ -75,12 +74,14 @@ export default function App() {
     return () => clearTimeout(saveTimer.current);
   }, [nodes, edges]);
 
+  // Chat link carries the active project so the chat page pre-selects it
+  const chatHref = activeProject ? `/chat?project=${encodeURIComponent(activeProject)}` : '/chat';
+
   return (
     <div className="app">
       <header className="topbar">
         <span className="topbar__title">{APP.title}</span>
 
-        {/* Project selector */}
         {projects.length > 0 && (
           <select
             className="topbar__project-select"
@@ -94,7 +95,6 @@ export default function App() {
           </select>
         )}
 
-        {/* Save status */}
         {activeProject && saveStatus !== 'idle' && (
           <span className={`topbar__save-status topbar__save-status--${saveStatus}`}>
             {saveStatus === 'saving' && '↑ saving…'}
@@ -103,14 +103,9 @@ export default function App() {
           </span>
         )}
 
-        {/* Chat toggle */}
-        <button
-          className={`topbar__chat-btn${showChat ? ' topbar__chat-btn--active' : ''}`}
-          onClick={() => setShowChat((v) => !v)}
-          title="Toggle agent chat"
-        >
+        <Link to={chatHref} className="topbar__chat-btn">
           💬 Chat
-        </button>
+        </Link>
 
         <div className="topbar__stats">
           <span>{nodes.length} nodes</span>
@@ -133,7 +128,6 @@ export default function App() {
 
       <div className="layout">
         <Sidebar />
-        {showChat && <ChatPanel activeProject={activeProject} />}
         <main className="canvas-wrap">
           <Canvas />
         </main>
