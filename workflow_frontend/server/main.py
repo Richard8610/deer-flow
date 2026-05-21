@@ -137,8 +137,10 @@ async def chat_stream(body: dict[str, Any]) -> StreamingResponse:
                 async for chunk in resp.aiter_bytes():
                     yield chunk
         except Exception as exc:
-            # Yield an SSE error event so the frontend can display it
             import json as _json
-            yield f"event: error\ndata: {_json.dumps(str(exc))}\n\n".encode()
+            msg = str(exc)
+            if "connection" in msg.lower() or "connect" in msg.lower():
+                msg = f"Cannot reach DeerFlow gateway at {GW_BASE}. Is the backend running? Try: make dev"
+            yield f"event: error\ndata: {_json.dumps(msg)}\n\n".encode()
 
     return StreamingResponse(_stream(), media_type="text/event-stream")
