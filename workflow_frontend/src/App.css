@@ -18,6 +18,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .topbar__link    { font-size: 12px; color: #64748B; text-decoration: none; }
 .topbar__link:hover { color: #F1F5F9; }
 
+.topbar__project-select {
+  background: #0F172A; color: #E2E8F0; border: 1px solid #334155;
+  border-radius: 6px; padding: 3px 8px; font-size: 12px;
+  cursor: pointer; outline: none; max-width: 180px;
+}
+.topbar__project-select:focus { border-color: #3B82F6; }
+
+.topbar__save-status         { font-size: 11px; }
+.topbar__save-status--saving { color: #94A3B8; }
+.topbar__save-status--saved  { color: #34D399; }
+.topbar__save-status--error  { color: #F87171; }
+
 /* ── Sidebar ───────────────────────────────────────────────────────────── */
 .sidebar {
   width: 240px; flex-shrink: 0; background: #1E293B;
