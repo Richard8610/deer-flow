@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react'; // useState kept for messages/input/file/skills/tools/dragging
 import { fetchSkills, type Skill } from '../api';
 
 const TOOLS = ['Calculator', 'Web Search', 'Image Generator'];
@@ -15,7 +15,6 @@ function mockBotReply(userText: string): string {
 }
 
 export function FloatingChat() {
-  const [open, setOpen]               = useState(false);
   const [messages, setMessages]       = useState<Msg[]>([]);
   const [input, setInput]             = useState('');
   const [file, setFile]               = useState<File | null>(null);
@@ -30,11 +29,8 @@ export function FloatingChat() {
 
   useEffect(() => {
     fetchSkills().then(setSkills).catch(() => setSkills([]));
+    inputRef.current?.focus();
   }, []);
-
-  useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -80,38 +76,23 @@ export function FloatingChat() {
   function onDrop(e: React.DragEvent)     { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0] ?? null); }
 
   return (
-    <>
-      {/* Collapsed toggle button */}
-      {!open && (
-        <button
-          className="fc-toggle"
-          onClick={() => setOpen(true)}
-          aria-label="Open chat"
-        >
-          💬
-        </button>
-      )}
-
-      {/* Expanded window */}
-      {open && (
-        <div className="fc-window" role="dialog" aria-label="AI Chat Assistant">
+    <div className="fc-window" role="dialog" aria-label="AI Chat Assistant">
           {/* Header */}
           <div className="fc-header">
             <span className="fc-header__title">AI Chat Assistant</span>
-            <button className="fc-header__close" onClick={() => setOpen(false)} aria-label="Close chat">✕</button>
           </div>
 
-          {/* Message history */}
-          <div className="fc-messages" ref={scrollRef}>
-            {messages.length === 0 ? (
-              <p className="fc-empty">Send a message to start the conversation.</p>
-            ) : messages.map((m) => (
-              <div key={m.id} className={`fc-msg fc-msg--${m.role}`}>
-                <span className="fc-msg__label">{m.role === 'user' ? 'You' : 'Bot'}</span>
-                <div className="fc-msg__bubble">{m.text}</div>
-              </div>
-            ))}
-          </div>
+          {/* Message history — only shown once conversation starts */}
+          {messages.length > 0 && (
+            <div className="fc-messages" ref={scrollRef}>
+              {messages.map((m) => (
+                <div key={m.id} className={`fc-msg fc-msg--${m.role}`}>
+                  <span className="fc-msg__label">{m.role === 'user' ? 'You' : 'Bot'}</span>
+                  <div className="fc-msg__bubble">{m.text}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Toolbar */}
           <div className="fc-toolbar">
@@ -187,8 +168,6 @@ export function FloatingChat() {
               ↑
             </button>
           </div>
-        </div>
-      )}
-    </>
+    </div>
   );
 }
