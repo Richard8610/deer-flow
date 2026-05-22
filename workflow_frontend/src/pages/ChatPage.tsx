@@ -1,185 +1,64 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { streamChat, fetchProjects, type ChatMessage } from '../api';
+import { Link } from 'react-router-dom';
 import { APP } from '../workflow.config';
-
-const WORKFLOW_JSON_RE = /```(?:json)?\s*(\{[\s\S]*?"nodes"[\s\S]*?"edges"[\s\S]*?\})\s*```/;
-
-function extractWorkflowJSON(text: string): string | null {
-  const m = text.match(WORKFLOW_JSON_RE);
-  if (!m) return null;
-  try { JSON.parse(m[1]); return m[1]; } catch { return null; }
-}
-
-function workflowToBase64(json: string): string {
-  return btoa(json);
-}
-
-interface Msg {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  error?: boolean;
-}
+import { FloatingChat } from '../components/FloatingChat';
 
 export function ChatPage() {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-
-  const [projects, setProjects]         = useState<string[]>([]);
-  const [activeProject, setActiveProject] = useState(searchParams.get('project') ?? '');
-  const [messages, setMessages]         = useState<Msg[]>([]);
-  const [input, setInput]               = useState('');
-  const [streaming, setStreaming]       = useState(false);
-
-  const scrollRef  = useRef<HTMLDivElement>(null);
-  const inputRef   = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    fetchProjects().then(setProjects).catch(() => setProjects([]));
-  }, []);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages]);
-
-  const handleProjectChange = useCallback((name: string) => {
-    setActiveProject(name);
-    const url = name ? `/chat?project=${encodeURIComponent(name)}` : '/chat';
-    navigate(url, { replace: true });
-  }, [navigate]);
-
-  async function send() {
-    const text = input.trim();
-    if (!text || streaming) return;
-
-    const userMsg: Msg = { id: `u-${Date.now()}`, role: 'user', content: text };
-    const aiId = `a-${Date.now()}`;
-    const aiMsg: Msg = { id: aiId, role: 'assistant', content: '' };
-
-    setMessages((prev) => [...prev, userMsg, aiMsg]);
-    setInput('');
-    setStreaming(true);
-
-    const history: ChatMessage[] = [...messages, userMsg].map(({ role, content }) => ({ role, content }));
-
-    try {
-      await streamChat(
-        history,
-        activeProject,
-        (chunk) => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiId ? { ...m, content: m.content + chunk } : m)),
-          );
-        },
-        (errMsg) => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === aiId ? { ...m, content: errMsg, error: true } : m)),
-          );
-        },
-      );
-    } catch (e) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === aiId ? { ...m, content: String(e), error: true } : m,
-        ),
-      );
-    } finally {
-      setStreaming(false);
-      inputRef.current?.focus();
-    }
-  }
-
-  const lastAI = [...messages].reverse().find((m) => m.role === 'assistant' && m.content);
-  const embeddedJSON = lastAI ? extractWorkflowJSON(lastAI.content) : null;
-  const builderHref = embeddedJSON
-    ? `/?workflow=${encodeURIComponent(workflowToBase64(embeddedJSON))}`
-    : '/';
-
   return (
     <div className="chat-page">
       <header className="topbar">
         <Link to="/" className="topbar__back">← Builder</Link>
-        <span className="topbar__title">{APP.title} — Agent Chat</span>
-
-        {projects.length > 0 && (
-          <select
-            className="topbar__project-select"
-            value={activeProject}
-            onChange={(e) => handleProjectChange(e.target.value)}
-          >
-            <option value="">— no project —</option>
-            {projects.map((p) => (
-              <option key={p} value={p}>{p.replace(/_/g, ' ')}</option>
-            ))}
-          </select>
-        )}
-
-        {embeddedJSON && (
-          <Link to={builderHref} className="topbar__chat-btn topbar__chat-btn--active">
-            ↙ Open in Builder
-          </Link>
-        )}
+        <span className="topbar__title">{APP.title} — AI Assistant</span>
       </header>
 
-      <div className="chat-full">
-        <div className="chat-full__messages" ref={scrollRef}>
-          {messages.length === 0 ? (
-            <div className="chat-panel__empty">
-              <p>Describe the workflow you want to build.</p>
-              <p>The agent will help plan it — if it outputs a workflow definition you can open it in the Builder.</p>
-              {!activeProject && projects.length > 0 && (
-                <p style={{ color: '#64748B', fontSize: '11px' }}>
-                  Select a project above to route your message to the right agent.
-                </p>
-              )}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px', maxWidth: '860px', width: '100%', margin: '0 auto' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 700, color: '#F1F5F9', marginBottom: '8px' }}>
+          AI Chat Assistant
+        </h1>
+        <p style={{ fontSize: '14px', color: '#64748B', marginBottom: '32px' }}>
+          Use the chat widget in the bottom-right corner to interact with the AI assistant.
+          Select a skill and tools, upload documents, and send messages to get started.
+        </p>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+          {[
+            { icon: '🗺️', title: 'Plan your workflow', desc: 'Describe the process you want to automate and the assistant will help you map out the steps.' },
+            { icon: '🔍', title: 'Research & analysis', desc: 'Ask the assistant to gather information, compare options, or summarise documents you upload.' },
+            { icon: '🛠️', title: 'Select the right tools', desc: 'Toggle Calculator, Web Search, or Image Generator to extend what the assistant can do.' },
+            { icon: '📄', title: 'Upload context docs', desc: 'Drag-and-drop a PDF, Markdown, or Word file to give the assistant extra context for your task.' },
+            { icon: '⚡', title: 'Pick a skill', desc: 'Skills are pre-built prompt templates that prime the assistant for a specific domain or task type.' },
+            { icon: '↙', title: 'Open in Builder', desc: 'When the assistant outputs a workflow definition you can open it directly in the visual Builder.' },
+          ].map((card) => (
+            <div
+              key={card.title}
+              style={{
+                background: '#1E293B', border: '1px solid #334155', borderRadius: '12px',
+                padding: '20px', display: 'flex', flexDirection: 'column', gap: '8px',
+              }}
+            >
+              <span style={{ fontSize: '28px' }}>{card.icon}</span>
+              <span style={{ fontSize: '14px', fontWeight: 700, color: '#E2E8F0' }}>{card.title}</span>
+              <span style={{ fontSize: '12px', color: '#64748B', lineHeight: 1.5 }}>{card.desc}</span>
             </div>
-          ) : (
-            messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`chat-msg chat-msg--${msg.role}${msg.error ? ' chat-msg--error' : ''}`}
-              >
-                <div className="chat-msg__label">{msg.role === 'user' ? 'You' : 'Agent'}</div>
-                <div className="chat-msg__bubble">
-                  {msg.content
-                    ? <pre className="chat-msg__text">{msg.content}</pre>
-                    : streaming && msg.role === 'assistant'
-                      ? <span className="chat-msg__thinking">thinking…</span>
-                      : null
-                  }
-                </div>
-              </div>
-            ))
-          )}
+          ))}
         </div>
 
-        <div className="chat-full__footer">
-          <textarea
-            ref={inputRef}
-            className="chat-panel__input"
-            placeholder={activeProject
-              ? `Describe a workflow for "${activeProject.replace(/_/g, ' ')}"…`
-              : 'Describe the workflow you want to build…'}
-            rows={3}
-            value={input}
-            disabled={streaming}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send(); }
-            }}
-          />
-          <button
-            className="chat-panel__send"
-            disabled={!input.trim() || streaming}
-            onClick={() => void send()}
-            title="Send (Enter)"
-          >
-            {streaming ? <span className="chat-panel__spinner" /> : '↑'}
-          </button>
+        <div style={{ background: '#1E293B', border: '1px solid #334155', borderRadius: '12px', padding: '20px' }}>
+          <h2 style={{ fontSize: '14px', fontWeight: 700, color: '#F1F5F9', marginBottom: '12px' }}>Workflow tips</h2>
+          <ul style={{ paddingLeft: '18px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {[
+              'Be specific about inputs and outputs when describing a workflow step.',
+              'Upload a reference document to give the assistant extra context.',
+              'Use the skill selector to load a domain-specific prompt template.',
+              'Enable Web Search when you need up-to-date information.',
+              'Press Shift+Enter in the chat input to add a new line without sending.',
+            ].map((tip) => (
+              <li key={tip} style={{ fontSize: '13px', color: '#94A3B8', lineHeight: 1.5 }}>{tip}</li>
+            ))}
+          </ul>
         </div>
       </div>
+
+      <FloatingChat />
     </div>
   );
 }

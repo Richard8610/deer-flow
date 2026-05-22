@@ -96,3 +96,15 @@ export async function saveWorkflow(project: string, data: WorkflowData): Promise
   });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
 }
+
+export interface Skill {
+  name: string;
+  description: string;
+}
+
+export async function fetchSkills(): Promise<Skill[]> {
+  const r = await fetch('/api/skills');
+  if (!r.ok) return [];
+  const data = (await r.json()) as { skills: Skill[] };
+  return data.skills;
+}

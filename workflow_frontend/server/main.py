@@ -103,6 +103,40 @@ def save_workflow(name: str, body: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "path": str(wf_file.relative_to(PROJECTS_DIR.parent))}
 
 
+# ── Skills list ────────────────────────────────────────────────────────────
+
+SKILLS_DIR = (Path(__file__).parent.parent.parent / "skills").resolve()
+
+
+@app.get("/api/skills")
+def list_skills() -> dict[str, list[dict]]:
+    """Return skill name + description from public/ and custom/ subdirectories."""
+    import re
+    skills = []
+    for sub in ("public", "custom"):
+        subdir = SKILLS_DIR / sub
+        if not subdir.exists():
+            continue
+        for skill_dir in sorted(subdir.iterdir()):
+            md = skill_dir / "SKILL.md"
+            if not md.exists():
+                continue
+            text = md.read_text(encoding="utf-8")
+            # Extract YAML frontmatter between --- markers
+            m = re.match(r"^---\s*\n(.*?)\n---", text, re.DOTALL)
+            if not m:
+                continue
+            fm = m.group(1)
+            name_m = re.search(r"^name:\s*(.+)$", fm, re.MULTILINE)
+            desc_m = re.search(r"^description:\s*(.+)$", fm, re.MULTILINE)
+            if name_m:
+                skills.append({
+                    "name": name_m.group(1).strip(),
+                    "description": desc_m.group(1).strip() if desc_m else "",
+                })
+    return {"skills": skills}
+
+
 # ── Chat proxy ─────────────────────────────────────────────────────────────
 
 
