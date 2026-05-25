@@ -100,6 +100,7 @@ export async function saveWorkflow(project: string, data: WorkflowData): Promise
 export interface Skill {
   name: string;
   description: string;
+  category: 'public' | 'custom';
 }
 
 export async function fetchSkills(): Promise<Skill[]> {

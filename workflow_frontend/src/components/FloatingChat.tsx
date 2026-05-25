@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'; // useState kept for messages/input/file/skills/tools/dragging
+import { useEffect, useRef, useState } from 'react';
 import { fetchSkills, type Skill } from '../api';
 
 const TOOLS = ['Calculator', 'Web Search', 'Image Generator'];
@@ -15,22 +15,58 @@ function mockBotReply(userText: string): string {
 }
 
 export function FloatingChat() {
-  const [messages, setMessages]       = useState<Msg[]>([]);
-  const [input, setInput]             = useState('');
-  const [file, setFile]               = useState<File | null>(null);
-  const [skills, setSkills]           = useState<Skill[]>([]);
-  const [selectedSkill, setSelectedSkill] = useState('');
+  const [messages, setMessages]           = useState<Msg[]>([]);
+  const [input, setInput]                 = useState('');
+  const [file, setFile]                   = useState<File | null>(null);
+  const [skills, setSkills]               = useState<Skill[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [skillPanelOpen, setSkillPanelOpen] = useState(true);
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
-  const [dragging, setDragging]       = useState(false);
+  const [dragging, setDragging]           = useState(false);
 
-  const scrollRef  = useRef<HTMLDivElement>(null);
-  const fileRef    = useRef<HTMLInputElement>(null);
-  const inputRef   = useRef<HTMLTextAreaElement>(null);
+  const scrollRef    = useRef<HTMLDivElement>(null);
+  const fileRef      = useRef<HTMLInputElement>(null);
+  const inputRef     = useRef<HTMLTextAreaElement>(null);
+  const skillPanelRef = useRef<HTMLDivElement>(null);
 
+  // Initial load — auto-select all public skills
   useEffect(() => {
-    fetchSkills().then(setSkills).catch(() => setSkills([]));
+    fetchSkills()
+      .then((loaded) => {
+        setSkills(loaded);
+        setSelectedSkills(loaded.filter((s) => s.category === 'public').map((s) => s.name));
+      })
+      .catch(() => {});
     inputRef.current?.focus();
   }, []);
+
+  // Poll for newly created custom skills every 15 s
+  useEffect(() => {
+    const id = setInterval(() => {
+      fetchSkills()
+        .then((loaded) => {
+          setSkills((prev) => {
+            const prevNames = new Set(prev.map((s) => s.name));
+            const newCustom = loaded.filter((s) => s.category === 'custom' && !prevNames.has(s.name));
+            return newCustom.length ? [...prev, ...newCustom] : prev;
+          });
+        })
+        .catch(() => {});
+    }, 15_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Close skill panel when clicking outside
+  useEffect(() => {
+    if (!skillPanelOpen) return;
+    function onClickOutside(e: MouseEvent) {
+      if (skillPanelRef.current && !skillPanelRef.current.contains(e.target as Node)) {
+        setSkillPanelOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [skillPanelOpen]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -44,8 +80,14 @@ export function FloatingChat() {
     if (!allowed.includes(ext)) { alert(`Unsupported file type: ${ext}`); return; }
     setFile(f);
     const reader = new FileReader();
-    reader.onload = (e) => console.log('[FloatingChat] file content preview:', (e.target?.result as string)?.slice(0, 500));
+    reader.onload = (e) => console.log('[FloatingChat] file preview:', (e.target?.result as string)?.slice(0, 500));
     reader.readAsText(f);
+  }
+
+  function toggleSkill(name: string) {
+    setSelectedSkills((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
+    );
   }
 
   function toggleTool(tool: string) {
@@ -57,9 +99,8 @@ export function FloatingChat() {
   function send() {
     const text = input.trim();
     if (!text) return;
-    const payload = { message: text, uploadedFile: file?.name ?? null, selectedSkill, selectedTools };
+    const payload = { message: text, uploadedFile: file?.name ?? null, selectedSkills, selectedTools };
     console.log('[FloatingChat] send:', payload);
-
     const uid = `u-${Date.now()}`;
     const bid = `b-${Date.now() + 1}`;
     setMessages((prev) => [
@@ -70,104 +111,152 @@ export function FloatingChat() {
     setInput('');
   }
 
-  // ── Drag-and-drop ──────────────────────────────────────────────────────────
   function onDragOver(e: React.DragEvent) { e.preventDefault(); setDragging(true); }
   function onDragLeave()                  { setDragging(false); }
   function onDrop(e: React.DragEvent)     { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0] ?? null); }
 
+  const publicSkills = skills.filter((s) => s.category === 'public');
+  const customSkills = skills.filter((s) => s.category === 'custom');
+
+  const skillSummary = selectedSkills.length === 0
+    ? 'No skills selected'
+    : `${selectedSkills.length} skill${selectedSkills.length !== 1 ? 's' : ''} selected`;
+
   return (
     <div className="fc-window" role="dialog" aria-label="AI Chat Assistant">
-          {/* Header */}
-          <div className="fc-header">
-            <span className="fc-header__title">AI Chat Assistant</span>
-          </div>
+      {/* Header */}
+      <div className="fc-header">
+        <span className="fc-header__title">AI Chat Assistant</span>
+      </div>
 
-          {/* Message history — only shown once conversation starts */}
-          {messages.length > 0 && (
-            <div className="fc-messages" ref={scrollRef}>
-              {messages.map((m) => (
-                <div key={m.id} className={`fc-msg fc-msg--${m.role}`}>
-                  <span className="fc-msg__label">{m.role === 'user' ? 'You' : 'Bot'}</span>
-                  <div className="fc-msg__bubble">{m.text}</div>
+      {/* Message history */}
+      {messages.length > 0 && (
+        <div className="fc-messages" ref={scrollRef}>
+          {messages.map((m) => (
+            <div key={m.id} className={`fc-msg fc-msg--${m.role}`}>
+              <span className="fc-msg__label">{m.role === 'user' ? 'You' : 'Bot'}</span>
+              <div className="fc-msg__bubble">{m.text}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Toolbar */}
+      <div className="fc-toolbar">
+        {/* File upload */}
+        <div
+          className={`fc-drop${dragging ? ' fc-drop--active' : ''}`}
+          onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+          onClick={() => fileRef.current?.click()}
+          role="button" tabIndex={0} aria-label="Upload document"
+          onKeyDown={(e) => e.key === 'Enter' && fileRef.current?.click()}
+        >
+          {file
+            ? <span className="fc-drop__file">📄 {file.name} <button className="fc-drop__remove" onClick={(e) => { e.stopPropagation(); setFile(null); }} aria-label="Remove file">✕</button></span>
+            : <span>📎 Upload file <span className="fc-drop__hint">(pdf, txt, docx, md)</span></span>
+          }
+        </div>
+        <input ref={fileRef} type="file" accept={ACCEPT} style={{ display: 'none' }} onChange={(e) => handleFile(e.target.files?.[0] ?? null)} />
+
+        {/* Skill dropdown */}
+        <div className="fc-field fc-skill-field" ref={skillPanelRef}>
+          <span className="fc-label">Skills</span>
+          <button
+            className={`fc-skill-trigger${skillPanelOpen ? ' fc-skill-trigger--open' : ''}`}
+            onClick={() => setSkillPanelOpen((v) => !v)}
+            aria-expanded={skillPanelOpen}
+          >
+            <span>{skillSummary}</span>
+            <span className="fc-skill-arrow">{skillPanelOpen ? '▲' : '▼'}</span>
+          </button>
+
+          {skillPanelOpen && (
+            <div className="fc-skill-panel">
+              {/* Public skills */}
+              {publicSkills.length > 0 && (
+                <div className="fc-skill-section">
+                  <div className="fc-skill-section-header">
+                    <span className="fc-skill-section-label">Public</span>
+                    <span className="fc-skill-actions">
+                      <button className="fc-skill-action" onClick={() => setSelectedSkills((prev) => [...new Set([...prev, ...publicSkills.map((s) => s.name)])])}>All</button>
+                      <button className="fc-skill-action" onClick={() => setSelectedSkills((prev) => prev.filter((n) => !publicSkills.some((s) => s.name === n)))}>None</button>
+                    </span>
+                  </div>
+                  {publicSkills.map((s) => (
+                    <label key={s.name} className="fc-skill-item" title={s.description}>
+                      <input
+                        type="checkbox"
+                        className="fc-skill-checkbox"
+                        checked={selectedSkills.includes(s.name)}
+                        onChange={() => toggleSkill(s.name)}
+                      />
+                      <span>{s.name}</span>
+                    </label>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
+              )}
 
-          {/* Toolbar */}
-          <div className="fc-toolbar">
-            {/* File upload */}
-            <div
-              className={`fc-drop${dragging ? ' fc-drop--active' : ''}`}
-              onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
-              onClick={() => fileRef.current?.click()}
-              role="button"
-              tabIndex={0}
-              aria-label="Upload document"
-              onKeyDown={(e) => e.key === 'Enter' && fileRef.current?.click()}
-            >
-              {file
-                ? <span className="fc-drop__file">📄 {file.name} <button className="fc-drop__remove" onClick={(e) => { e.stopPropagation(); setFile(null); }} aria-label="Remove file">✕</button></span>
-                : <span>📎 Upload file <span className="fc-drop__hint">(pdf, txt, docx, md)</span></span>
-              }
-            </div>
-            <input ref={fileRef} type="file" accept={ACCEPT} style={{ display: 'none' }} onChange={(e) => handleFile(e.target.files?.[0] ?? null)} />
-
-            {/* Skill selector */}
-            <div className="fc-field">
-              <label className="fc-label" htmlFor="fc-skill">Select a skill</label>
-              <select
-                id="fc-skill"
-                className="fc-select"
-                value={selectedSkill}
-                onChange={(e) => setSelectedSkill(e.target.value)}
-              >
-                <option value="">— none —</option>
-                {skills.map((s) => (
-                  <option key={s.name} value={s.name} title={s.description}>{s.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Tool chips */}
-            <div className="fc-field">
-              <span className="fc-label">Select tools</span>
-              <div className="fc-chips" role="group" aria-label="Tool selection">
-                {TOOLS.map((tool) => (
-                  <button
-                    key={tool}
-                    className={`fc-chip${selectedTools.includes(tool) ? ' fc-chip--on' : ''}`}
-                    onClick={() => toggleTool(tool)}
-                    aria-pressed={selectedTools.includes(tool)}
-                  >
-                    {tool}
-                  </button>
-                ))}
+              {/* Custom skills */}
+              <div className="fc-skill-section">
+                <span className="fc-skill-section-label fc-skill-section-label--custom">Custom</span>
+                {customSkills.length === 0
+                  ? <span className="fc-skill-empty">No custom skills yet</span>
+                  : customSkills.map((s) => (
+                    <label key={s.name} className="fc-skill-item fc-skill-item--custom" title={`Custom: ${s.description}`}>
+                      <input
+                        type="checkbox"
+                        className="fc-skill-checkbox"
+                        checked={selectedSkills.includes(s.name)}
+                        onChange={() => toggleSkill(s.name)}
+                      />
+                      <span>{s.name}</span>
+                    </label>
+                  ))
+                }
               </div>
             </div>
-          </div>
+          )}
+        </div>
 
-          {/* Input */}
-          <div className="fc-footer">
-            <textarea
-              ref={inputRef}
-              className="fc-input"
-              placeholder="Type a message…"
-              rows={2}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-              aria-label="Message input"
-            />
-            <button
-              className="fc-send"
-              onClick={send}
-              disabled={!input.trim()}
-              aria-label="Send message"
-            >
-              ↑
-            </button>
+        {/* Tool chips */}
+        <div className="fc-field">
+          <span className="fc-label">Select tools</span>
+          <div className="fc-chips" role="group" aria-label="Tool selection">
+            {TOOLS.map((tool) => (
+              <button
+                key={tool}
+                className={`fc-chip${selectedTools.includes(tool) ? ' fc-chip--on' : ''}`}
+                onClick={() => toggleTool(tool)}
+                aria-pressed={selectedTools.includes(tool)}
+              >
+                {tool}
+              </button>
+            ))}
           </div>
+        </div>
+      </div>
+
+      {/* Input */}
+      <div className="fc-footer">
+        <textarea
+          ref={inputRef}
+          className="fc-input"
+          placeholder="Type a message…"
+          rows={2}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+          aria-label="Message input"
+        />
+        <button
+          className="fc-send"
+          onClick={send}
+          disabled={!input.trim()}
+          aria-label="Send message"
+        >
+          ↑
+        </button>
+      </div>
     </div>
   );
 }

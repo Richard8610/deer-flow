@@ -368,6 +368,61 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .fc-chip:hover      { background: #334155; color: #E2E8F0; }
 .fc-chip--on        { background: #1D4ED8; border-color: #1D4ED8; color: #fff; }
 .fc-chip--on:hover  { background: #2563EB; }
+/* ── Skill dropdown ────────────────────────────────────────────────────── */
+.fc-skill-field { position: relative; }
+
+.fc-skill-trigger {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 5px 9px; border-radius: 6px; font-size: 12px;
+  background: #0F172A; color: #94A3B8; border: 1px solid #334155;
+  cursor: pointer; transition: border-color 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.fc-skill-trigger:hover, .fc-skill-trigger--open { border-color: #3B82F6; color: #E2E8F0; }
+.fc-skill-arrow { font-size: 9px; opacity: 0.6; flex-shrink: 0; }
+
+.fc-skill-panel {
+  background: #0F172A; border: 1px solid #334155; border-radius: 8px;
+  margin-top: 4px; overflow-y: auto; max-height: 180px;
+}
+
+.fc-skill-section { padding: 6px 0; }
+.fc-skill-section + .fc-skill-section { border-top: 1px solid #1E293B; }
+
+.fc-skill-section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 2px 10px 4px;
+}
+.fc-skill-section-label {
+  font-size: 9px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: #3B82F6;
+}
+.fc-skill-section-label--custom { color: #A78BFA; }
+.fc-skill-actions { display: flex; gap: 4px; }
+.fc-skill-action {
+  font-size: 9px; font-weight: 600; color: #64748B; background: none;
+  border: none; cursor: pointer; padding: 0 2px; font-family: inherit;
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.fc-skill-action:hover { color: #94A3B8; }
+
+.fc-skill-item {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 10px; font-size: 12px; color: #CBD5E1;
+  cursor: pointer; transition: background 0.1s;
+}
+.fc-skill-item:hover { background: #1E293B; }
+.fc-skill-item--custom { color: #C4B5FD; }
+
+.fc-skill-checkbox {
+  accent-color: #3B82F6; width: 13px; height: 13px; flex-shrink: 0; cursor: pointer;
+}
+.fc-skill-item--custom .fc-skill-checkbox { accent-color: #7C3AED; }
+
+.fc-skill-empty {
+  display: block; padding: 4px 10px; font-size: 11px;
+  color: #475569; font-style: italic;
+}
 
 .fc-footer {
   display: flex; gap: 8px; padding: 10px 12px;

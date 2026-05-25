@@ -133,6 +133,7 @@ def list_skills() -> dict[str, list[dict]]:
                 skills.append({
                     "name": name_m.group(1).strip(),
                     "description": desc_m.group(1).strip() if desc_m else "",
+                    "category": sub,
                 })
     return {"skills": skills}
 
