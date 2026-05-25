@@ -1,0 +1,12 @@
+project_name: travel_planner
+version: "1.0.0"
+description: "输入城市名称，返回详细时间表和旅行攻略"
+
+# Runtime parameters
+workflow:
+  timeout_seconds: 300
+
+# Travel planner settings
+travel:
+  max_days: 5
+  include_pricing: true

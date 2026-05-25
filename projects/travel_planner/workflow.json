@@ -1,0 +1,141 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "type": "io",
+      "position": {
+        "x": 40,
+        "y": 200
+      },
+      "data": {
+        "nodeKind": "start",
+        "label": "开始",
+        "description": "接收用户输入的城市名称"
+      },
+      "measured": {
+        "width": 220,
+        "height": 82
+      }
+    },
+    {
+      "id": "validate_input",
+      "type": "process",
+      "position": {
+        "x": 280,
+        "y": 200
+      },
+      "data": {
+        "nodeKind": "tool",
+        "label": "验证输入",
+        "description": "验证城市名称输入是否有效",
+        "toolName": "validate_input",
+        "outputFields": [
+          "city_name",
+          "is_valid"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 105
+      }
+    },
+    {
+      "id": "generate_travel_plan",
+      "type": "process",
+      "position": {
+        "x": 520,
+        "y": 200
+      },
+      "data": {
+        "nodeKind": "llm",
+        "label": "生成旅行计划",
+        "description": "调用LLM生成详细行程安排和攻略",
+        "model": "default",
+        "prompt": "为指定城市生成详细旅行攻略",
+        "inputFields": [
+          "city_name"
+        ],
+        "outputFields": [
+          "travel_plan"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 122
+      }
+    },
+    {
+      "id": "save_result",
+      "type": "process",
+      "position": {
+        "x": 760,
+        "y": 200
+      },
+      "data": {
+        "nodeKind": "tool",
+        "label": "保存结果",
+        "description": "将生成的旅行计划保存到文件",
+        "toolName": "save_result",
+        "inputFields": [
+          "travel_plan",
+          "city_name"
+        ],
+        "outputFields": [
+          "final_output",
+          "output_path"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 122
+      }
+    },
+    {
+      "id": "end",
+      "type": "io",
+      "position": {
+        "x": 1000,
+        "y": 200
+      },
+      "data": {
+        "nodeKind": "end",
+        "label": "完成",
+        "description": "输出旅行计划"
+      },
+      "measured": {
+        "width": 220,
+        "height": 84
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "start",
+      "target": "validate_input",
+      "type": "dataflow",
+      "animated": true
+    },
+    {
+      "id": "e2",
+      "source": "validate_input",
+      "target": "generate_travel_plan",
+      "type": "dataflow",
+      "animated": true
+    },
+    {
+      "id": "e3",
+      "source": "generate_travel_plan",
+      "target": "save_result",
+      "type": "dataflow",
+      "animated": true
+    },
+    {
+      "id": "e4",
+      "source": "save_result",
+      "target": "end",
+      "type": "dataflow",
+      "animated": true
+    }
+  ]
+}
