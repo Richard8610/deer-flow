@@ -46,7 +46,8 @@ export async function streamChat(
           return;
         }
 
-        if (event === 'messages-tuple') {
+        // Gateway may emit 'messages-tuple' or fall back to 'messages' — handle both
+        if (event === 'messages-tuple' || event === 'messages') {
           try {
             const [chunk] = JSON.parse(raw) as [{ content: unknown; type: string }];
             // Only forward plain-text AI chunks (skip tool calls, human msgs, etc.)

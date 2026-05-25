@@ -39,11 +39,12 @@ app.add_middleware(
 # ── Gateway client (shared, persists cookies) ──────────────────────────────
 
 _gw_client: httpx.AsyncClient | None = None
+_csrf_token: str = ""
 
 
 async def _gateway() -> httpx.AsyncClient:
     """Return an authenticated httpx client for the DeerFlow gateway."""
-    global _gw_client
+    global _gw_client, _csrf_token
     if _gw_client is not None:
         return _gw_client
 
@@ -54,7 +55,9 @@ async def _gateway() -> httpx.AsyncClient:
             data={"username": GW_EMAIL, "password": GW_PASSWORD},
         )
         r.raise_for_status()
-        print(f"[chat] authenticated with gateway as {GW_EMAIL}")
+        # Extract CSRF token from cookie so we can include it in POST headers
+        _csrf_token = _gw_client.cookies.get("csrf_token", "")
+        print(f"[chat] authenticated with gateway as {GW_EMAIL} (csrf={'ok' if _csrf_token else 'missing'})")
     except Exception as exc:
         print(f"[chat] warning — gateway auth failed: {exc}")
     return _gw_client
@@ -170,7 +173,8 @@ async def chat_stream(body: dict[str, Any]) -> StreamingResponse:
     messages: list[dict] = body.get("messages", [])
     project: str = body.get("project", "")
     model: str = body.get("model", "")
-    assistant_id = f"{project}_agent" if project else "project_agent"
+    # Map project name to an agent ID, falling back to the system lead agent
+    assistant_id = project if project else "lead_agent"
 
     payload: dict[str, Any] = {
         "assistant_id": assistant_id,
@@ -189,6 +193,7 @@ async def chat_stream(body: dict[str, Any]) -> StreamingResponse:
                 "POST",
                 f"{GW_BASE}/api/runs/stream",
                 json=payload,
+                headers={"X-CSRF-Token": _csrf_token} if _csrf_token else {},
             ) as resp:
                 async for chunk in resp.aiter_bytes():
                     yield chunk
