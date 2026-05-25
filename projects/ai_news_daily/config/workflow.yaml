@@ -1,0 +1,48 @@
+project_name: ai_news_daily
+version: "1.0.0"
+description: "Fetch AI RSS feeds → score → top-N → LLM digest → Telegram/webhook delivery"
+
+collector:
+  feeds:
+    - https://ai.googleblog.com/atom.xml
+    - https://openai.com/blog/rss.xml
+    - https://www.aitimes.com/rss
+    - https://techcrunch.com/category/artificial-intelligence/feed/
+    - https://www.kdnuggets.com/feed
+  top_n: 3                   # number of stories to include in digest
+  fetch_timeout_seconds: 30  # per-feed HTTP timeout
+
+scoring:
+  ai_keywords:
+    - ai
+    - artificial
+    - intelligence
+    - machine
+    - learning
+    - model
+    - llm
+    - gpt
+    - chatbot
+    - neural
+    - deep
+    - openai
+    - google
+    - gemini
+    - transformer
+  ai_keyword_weight: 2       # multiplier vs normal keywords
+
+digest:
+  max_summary_chars: 200
+  model_name: null           # null → default model from config.yaml
+
+notification:
+  method: telegram           # telegram | webhook | file
+  telegram:
+    bot_token: null          # set via TELEGRAM_BOT_TOKEN env var or config.json
+    chat_id: null            # set via TELEGRAM_CHAT_ID env var or config.json
+    parse_mode: Markdown
+  webhook:
+    url: null                # set via WEBHOOK_URL env var
+  output:
+    dir: null                # null → {DEER_FLOW_HOME}/projects/ai_news_daily/
+    filename_pattern: "ai_news_{date}.md"
