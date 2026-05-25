@@ -33,16 +33,6 @@ export default function App() {
       .catch((err) => console.error('Failed to load workflow from URL:', err));
   }, [importJSON]);
 
-  // Auto-select project from ?project=<name> URL param once the project list is loaded
-  useEffect(() => {
-    if (didAutoSelect.current || projects.length === 0) return;
-    const param = new URLSearchParams(window.location.search).get('project');
-    if (param && projects.includes(param)) {
-      didAutoSelect.current = true;
-      void handleProjectChange(param);
-    }
-  }, [projects, handleProjectChange]);
-
   // Discover projects from persistence server
   useEffect(() => {
     fetchProjects().then(setProjects).catch(() => setProjects([]));
@@ -62,6 +52,16 @@ export default function App() {
       console.error('Failed to load project workflow:', e);
     }
   }, [importJSON]);
+
+  // Auto-select project from ?project=<name> URL param once the project list is loaded
+  useEffect(() => {
+    if (didAutoSelect.current || projects.length === 0) return;
+    const param = new URLSearchParams(window.location.search).get('project');
+    if (param && projects.includes(param)) {
+      didAutoSelect.current = true;
+      void handleProjectChange(param);
+    }
+  }, [projects, handleProjectChange]);
 
   // Auto-save on canvas change (debounced 1 s)
   useEffect(() => {
