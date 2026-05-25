@@ -1,0 +1,285 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "type": "io",
+      "position": {
+        "x": -44.86447520048529,
+        "y": 268.7519325619809
+      },
+      "data": {
+        "nodeKind": "start",
+        "label": "Trigger",
+        "description": "Daily schedule or manual run"
+      },
+      "measured": {
+        "width": 220,
+        "height": 82
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "fetch-feeds",
+      "type": "process",
+      "position": {
+        "x": 240,
+        "y": 181.25322093663485
+      },
+      "data": {
+        "nodeKind": "tool",
+        "label": "Fetch RSS Feeds",
+        "description": "Pull articles from Google AI Blog, OpenAI, AI Times, TechCrunch, KDNuggets",
+        "toolName": "feedparser.parse",
+        "outputFields": [
+          "articles[]"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 136
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "score-news",
+      "type": "process",
+      "position": {
+        "x": 500,
+        "y": 323.89776435872716
+      },
+      "data": {
+        "nodeKind": "tool",
+        "label": "Score & Rank",
+        "description": "Weight articles by AI keyword frequency (llm, gpt, model, openai, …)",
+        "toolName": "score_news_importance",
+        "inputFields": [
+          "articles[]"
+        ],
+        "outputFields": [
+          "scored_articles[]"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 153
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "top3",
+      "type": "process",
+      "position": {
+        "x": 756.3887457361495,
+        "y": 246.25579768594272
+      },
+      "data": {
+        "nodeKind": "tool",
+        "label": "Extract Top 3",
+        "description": "Sort by score, keep top N stories (default 3)",
+        "toolName": "get_top_news",
+        "inputFields": [
+          "scored_articles[]"
+        ],
+        "outputFields": [
+          "top_news[]"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 138
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "format-message",
+      "type": "process",
+      "position": {
+        "x": 1020,
+        "y": 184.86447520048526
+      },
+      "data": {
+        "nodeKind": "llm",
+        "label": "Format Digest",
+        "description": "Compose a markdown news digest with title, summary (≤200 chars), and link for each story",
+        "model": "default",
+        "prompt": "Format the following top AI news stories into a concise daily digest with emoji headers, 200-char summaries, and source links.\n\nStories: {{top_news}}",
+        "inputFields": [
+          "top_news[]"
+        ],
+        "outputFields": [
+          "message"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 153
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "notify-condition",
+      "type": "condition",
+      "position": {
+        "x": 1276.3887457361495,
+        "y": 196.52684728497212
+      },
+      "data": {
+        "nodeKind": "condition",
+        "label": "Delivery Method?",
+        "description": "Route based on --method flag: telegram or webhook",
+        "inputFields": [
+          "method",
+          "message"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 140
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "send-telegram",
+      "type": "process",
+      "position": {
+        "x": 1520,
+        "y": 80
+      },
+      "data": {
+        "nodeKind": "tool",
+        "label": "Send Telegram",
+        "description": "POST to api.telegram.org/bot{token}/sendMessage with Markdown parse mode",
+        "toolName": "Notifier.send_telegram",
+        "inputFields": [
+          "message"
+        ],
+        "outputFields": [
+          "success"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 153
+      }
+    },
+    {
+      "id": "send-webhook",
+      "type": "process",
+      "position": {
+        "x": 1520,
+        "y": 340
+      },
+      "data": {
+        "nodeKind": "tool",
+        "label": "Send Webhook",
+        "description": "POST JSON payload {text, timestamp} to custom webhook URL",
+        "toolName": "Notifier.send_webhook",
+        "inputFields": [
+          "message"
+        ],
+        "outputFields": [
+          "success"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 138
+      }
+    },
+    {
+      "id": "end",
+      "type": "io",
+      "position": {
+        "x": 1760,
+        "y": 220
+      },
+      "data": {
+        "nodeKind": "end",
+        "label": "Done",
+        "description": "News digest delivered successfully",
+        "inputFields": [
+          "success"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 105
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "start",
+      "target": "fetch-feeds",
+      "type": "dataflow",
+      "animated": true
+    },
+    {
+      "id": "e2",
+      "source": "fetch-feeds",
+      "target": "score-news",
+      "type": "dataflow",
+      "animated": true
+    },
+    {
+      "id": "e3",
+      "source": "score-news",
+      "target": "top3",
+      "type": "dataflow",
+      "animated": true
+    },
+    {
+      "id": "e4",
+      "source": "top3",
+      "target": "format-message",
+      "type": "dataflow",
+      "animated": true
+    },
+    {
+      "id": "e5",
+      "source": "format-message",
+      "target": "notify-condition",
+      "type": "dataflow",
+      "animated": true
+    },
+    {
+      "id": "e6",
+      "source": "notify-condition",
+      "target": "send-telegram",
+      "type": "dataflow",
+      "animated": true,
+      "sourceHandle": "true",
+      "label": "telegram"
+    },
+    {
+      "id": "e7",
+      "source": "notify-condition",
+      "target": "send-webhook",
+      "type": "dataflow",
+      "animated": true,
+      "sourceHandle": "false",
+      "label": "webhook"
+    },
+    {
+      "id": "e8",
+      "source": "send-telegram",
+      "target": "end",
+      "type": "dataflow",
+      "animated": true
+    },
+    {
+      "id": "e9",
+      "source": "send-webhook",
+      "target": "end",
+      "type": "dataflow",
+      "animated": true
+    }
+  ]
+}
