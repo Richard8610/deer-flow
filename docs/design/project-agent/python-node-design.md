@@ -1,33 +1,32 @@
 # Project Agent 一节点一 Python 文件方案设计
 
-> **口径更新（2026-05）**：本方案已确定为主路线。每个工作流节点固化为独立 Python 文件，
-> 由业务 Agent（主 Agent）拆解子任务后派发 subagent 逐节点执行。
-> 详见 [`workflow-agent-architecture.md`](workflow-agent-architecture.md)。
+> **口径更新（2026-05）**：一节点一 Python 文件是 published workflow 的**高级执行实现**，不是第一期唯一目标。当前一期主线为：个人助手调用 workflow builder → 独立 Workflow Builder 编辑 → publish → 注册到「我的能力」。当前 MVP 以 `projects/{name}/src/graphs/{project}.py` + `workflow.json` + [workflow-code-generator](../../../skills/public/workflow-code-generator/SKILL.md) 为准，见 [implementation-status.md](implementation-status.md)。
 
 ## 背景
 
-`project_agent` 的目标是把 DeerFlow 从通用 Agent 运行时扩展为面向业务工作流的协同编排系统，仿照 Coze 编程式工作流功能。核心路线已明确：
+workflow builder 的目标是把 DeerFlow 从通用 Agent 运行时扩展为面向个人与团队工作的协同编排系统，仿照 Coze 编程式工作流功能。节点独立文件化路线如下：
 
 ```text
-自然语言需求 / Web 画布
-  -> project_agent 生成 WorkflowSpec
+个人助手对话 / 独立 Workflow Builder
+  -> workflow builder 生成 WorkflowSpec
   -> 生成 nodes/*.py + graph.py
-  -> 发布为业务 Agent
-  -> 主 Agent 拆子任务 -> subagent 逐节点执行 -> 评测/重试 -> 整合
+  -> publish 为 callable workflow
+  -> 注册到「我的能力」
+  -> 个人助手 / custom agent 调用
 ```
 
 本文聚焦一个已确定的设计选择：**将每个工作流节点固化为独立 Python 文件，支持 Agent 协同生成、前端画布编辑、Git 版本管理和独立测试。**
 
-结论：该方案在 DeerFlow 当前技术栈（Python + LangGraph）下完全可行，并已作为主路线确定。节点独立文件化有利于 Agent 协同、代码 review、单元测试和增量修改。
+结论：该方案在 DeerFlow 当前技术栈（Python + LangGraph）下完全可行，适合作为复杂 workflow 的演进目标。节点独立文件化有利于 Agent 协同、代码 review、单元测试和增量修改。
 
 ## 目标
 
 一节点一 Python 文件方案作为主路线，目标是：
 
 1. 每个业务节点有独立源码文件，便于阅读、测试、审计和局部修改。
-2. 前端画布编辑的是 WorkflowSpec，Agent 可根据用户语言修改 WorkflowSpec。
-3. project_agent 根据 WorkflowSpec 生成或更新节点 Python 文件和 LangGraph graph。
-4. 发布后的业务 Agent 运行时加载 Python graph，主 Agent 拆解子任务、派发 subagent 逐节点执行，而非 LLM 每次动态规划。
+2. 独立 Workflow Builder 编辑的是 WorkflowSpec，个人助手可根据用户语言修改 WorkflowSpec。
+3. workflow builder 根据 WorkflowSpec 生成或更新节点 Python 文件和 LangGraph graph。
+4. 发布后的 workflow 运行时加载 Python graph，个人助手 / custom agent 调用确定流程，而非 LLM 每次动态规划。
 5. 节点尽量接近纯函数：输入来自 `state/config`，输出为 state patch，副作用显式声明。
 6. 支持节点级评测（evaluate）和重试（retry）机制。
 
@@ -437,14 +436,14 @@ def test_workflow_graph_imports():
 ### 新建工作流
 
 ```text
-用户自然语言描述
-  -> project_agent 生成 WorkflowSpec
-  -> 前端展示
+用户通过个人助手自然语言描述
+  -> workflow builder 生成 WorkflowSpec
+  -> 独立 Workflow Builder 展示
   -> 用户调整
   -> 后端 validate
   -> codegen
   -> import check / smoke test
-  -> 用户确认发布
+  -> 用户确认发布到「我的能力」
 ```
 
 ### 修改工作流

@@ -2,9 +2,23 @@
 
 ## 背景
 
-经过多次讨论与澄清，`project_agent`（或称 `workflow_agent`）的核心定位已明确：**仿照 Coze 编程式工作流功能（非开源版本），协助管理员/开发者创建业务 Agent 及工作流，每个工作流节点是独立 Python 文件，发布后由业务 Agent 调度执行。**
+经过多次讨论与澄清，工作流创建的核心定位已从中心化 `project_agent` 调整为：**每个用户使用自己的个人助手 Agent，通过对话调用 workflow builder 能力，并在独立 Workflow Builder 画布中编辑、测试、发布工作流**。`project_agent` 可以继续作为当前代码中的实现骨架存在，但产品与架构概念上应退化为 workflow builder capability，而不是唯一创建主体。**初期人人可建**，治理见 [workflow-governance.md](workflow-governance.md)。
 
-核心设计原则：**最大化复用 DeerFlow 2.0 现有架构能力，在成熟骨架之上做确定性增强，而非另起炉灶。**
+核心设计原则：**最大化复用 DeerFlow 2.0 现有架构能力，在成熟骨架之上做确定性增强，而非另起炉灶。** 但复用 DeerFlow 不等于把工作流工具绑死在 `project_agent` 图里：DeerFlow 是企业级 Agent 基座，Workflow Builder 是运行其上的工具 / 应用模块。工具分层详见 [workflow-tool-architecture.md](workflow-tool-architecture.md)。
+
+### 当前 MVP（2026-05，相对目标架构）
+
+> 详见 [implementation-status.md](implementation-status.md)。
+
+| 能力 | 状态 |
+| --- | --- |
+| `workflow_frontend` 独立 Builder + Chat 落盘 `workflow.json` | ✅ |
+| `workflow-code-generator` skill + `_scaffold_project` | ✅ |
+| 示例 `projects/ai_news_daily`、`travel_planner`（`src/graphs/*.py`） | ✅ |
+| 个人助手调用 workflow builder → Builder 编辑 → publish → 注册「我的能力」 | ❌ 待打通 |
+| `workflow.draft` / `published`、decompose_v2、逐节点 `nodes/*.py` | ❌ 规划 |
+
+**执行真相源（当前）**：`projects/{name}/src/graphs/{project}.py` + 画布 `workflow.json`；**非** `workflow.published.json` 驱动拆解。一期目标不是退回纯对话 MVP，而是直接复用独立 Builder，把当前能力串成可创建、可编辑、可测试、可发布、可调用的闭环。
 
 ---
 
@@ -111,44 +125,37 @@ parse_input → decompose → search_skills → plan_workflow
 
 ```text
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ ① 设计态：project_agent + Web 画布                                       │
+│ ① 设计态：个人助手 + workflow builder + 独立 Builder                    │
 │    ┌─────────────┐     ┌──────────────────┐                             │
-│    │ 自然语言描述  │ ──▶ │ project_agent     │                            │
-│    │ Web 画布编辑  │ ◀──▶│ (复用 Lead Agent) │                            │
+│    │ 个人助手对话  │ ──▶ │ workflow builder │                            │
+│    │ 独立 Builder │ ◀──▶│ / code-generator │                            │
 │    └─────────────┘     └────────┬─────────┘                             │
 │                                 │ 生成                                   │
 │                    ┌────────────▼─────────┐                             │
 │                    │ WorkflowSpec          │                             │
-│                    │ nodes/*.py + graph.py │                             │
+│                    │ workflow.json          │                             │
+│                    │ runner / graph.py      │                             │
 │                    └──────────┬───────────┘                             │
 └───────────────────────────────┼──────────────────────────────────────────┘
                                 │ 发布
 ┌───────────────────────────────┼──────────────────────────────────────────┐
-│ ② 发布态：业务 Agent 注册                                                │
+│ ② 发布态：注册到用户「我的能力」                                        │
 │                    ┌──────────▼───────────┐                             │
-│                    │ agents/{name}/        │                             │
-│                    │   config.yaml          │ ← 复用 agents 配置体系      │
-│                    │   manifest.yaml        │ ← 🆕 商店元数据             │
-│                    │ projects/{name}/       │ ← 复用项目目录结构          │
-│                    │   src/nodes/*.py       │ ← 🆕 代码生成               │
-│                    │   src/graphs/           │ ← 复用 project graph 加载  │
+│                    │ users/{user}/workflows │                             │
+│                    │   manifest.yaml        │ ← 🆕 callable manifest       │
 │                    │   workflow.published.json│ ← 🆕 发布态 spec           │
+│                    │   src/graphs/           │ ← 复用 project graph 加载  │
 │                    └──────────────────────┘                             │
 └──────────────────────────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ ③ 运行态：主 Agent 驱动执行（复用 project_agent 骨架，升级 decompose）     │
+│ ③ 运行态：个人助手 / custom agent 调用 published workflow                │
 │                                                                          │
-│  parse_input ──▶ decompose* ──▶ execute_subtask × N ──▶ evaluate         │
+│  用户请求 ──▶ 个人助手 ──▶ 我的能力/已启用 workflow ──▶ runner/graph      │
 │                                                              │           │
-│                      ┌───────────────────────────────────────┤           │
-│                      │                                       │           │
-│              prepare_retry ◀── fail ────┐           pass ───▶ synthesize │
-│                      │                 │                          │      │
-│                      └── retry ────────┘                         END     │
+│       执行时使用调用者自己的 sandbox / memory / uploads / credentials     │
 │                                                                          │
-│  *decompose: 🆕 不再靠 LLM 动态拆解，改为读取 workflow.published.json      │
-│               按 DAG 确定拆解子任务序列                                     │
+│  复杂工作流仍可内部复用 project_agent 骨架：parse → decompose_v2 → execute │
 │                                                                          │
 │  execute_subtask: 🟢 复用 SubagentExecutor + _run_subagents_parallel     │
 │                    🆕 每个 subagent 加载对应 nodes/{node}.py              │
@@ -171,17 +178,17 @@ parse_input → decompose → search_skills → plan_workflow
 | **skills 体系** | ✅ | | Skill 加载、工具过滤、上下文注入 |
 | **middleware 链** | ✅ | | 14 个 middleware，业务 Agent 自动继承 |
 | **Gateway / IM / Client** | ✅ | | 三种入口均无需改动 |
-| **project_agent 骨架** | ✅ | | parse → decompose → execute → evaluate → retry → synthesize |
+| **project_agent / builder 骨架** | ✅ | | 当前实现可复用 parse → decompose → execute → evaluate → retry → synthesize |
 | **项目目录结构** | ✅ | | `projects/{name}/src/graphs/` 动态加载机制 |
 | **LangGraph Send 并行** | ✅ | | `_route_subtasks` + `Send` fan-out |
 | **检查点持久化** | ✅ | | SQLite / Redis checkpointer |
 | — | — | — | — |
 | **WorkflowSpec 定义** | | 🆕 | 节点类型、输入输出 schema、pass_condition |
-| **nodes/*.py 代码生成** | | 🆕 | project_agent 根据 Spec 生成节点代码 |
+| **nodes/*.py 代码生成** | | 🆕 | workflow builder 根据 Spec 生成节点代码 |
 | **确定拆解（decompose v2）** | | 🆕 | 读 workflow.published.json 替代 LLM 动态拆解 |
 | **节点级 evaluate** | | 🆕 | 结构化 pass_condition 替代纯 LLM 判断 |
-| **业务 Agent 商店** | | 🆕 | manifest.yaml + 选用流程 + 审批 |
-| **角色权限 developer** | | 🆕 | admin / developer / user 三级 |
+| **我的能力 / 工作流注册表** | | 🆕 | manifest.yaml + publish/install/fork |
+| **可选企业权限** | | 🆕 | admin / developer / user 三级可作为后置收窄 |
 | **per-user sandbox 策略** | | 🆕 | 每用户独立 sandbox 容器 |
 | **sandbox 自动伸缩** | | 🆕 | 预热池 + 按需分配 + 空闲回收 |
 
@@ -189,28 +196,29 @@ parse_input → decompose → search_skills → plan_workflow
 
 ## 三、逐层设计（复用标注）
 
-### 3.1 设计态：project_agent 生成工作流
+### 3.1 设计态：个人助手调用 workflow builder
 
 ```
-管理员: "我要创建供应商评估 Agent，流程是：
-         提取供应商→工商查询→舆情分析→风险评估→生成报告"
+用户: "帮我做一个供应商评估工作流，流程是：
+      提取供应商→工商查询→舆情分析→风险评估→生成报告"
 
-project_agent（复用 Lead Agent + RuntimeFeatures）:
-  1. 🟢 复用 SubagentExecutor 启动「工作流生成」子任务
+个人助手 Agent（lead_agent + user_id + 可选 agent_name）:
+  1. 🟢 调用 workflow builder / workflow-code-generator
   2. 🆕 输出结构化 WorkflowSpec（5 个节点定义）
-  3. 🟢 复用 Web 画布（workflow_frontend）展示 DAG
-  4. 🆕 管理员审阅并微调节点/连线
-  5. 🆕 project_agent 根据 Spec 生成 nodes/*.py + graph.py
+  3. 🟢 生成 workflow.json + 初始 runner/graph
+  4. 🟢 返回独立 Workflow Builder 链接
+  5. 🆕 用户在 Builder 审阅并微调节点/连线，也可继续对话修改
   6. 🆕 运行 smoke test（复用 SubagentExecutor）
-  7. 🆕 发布为业务 Agent「supplier-evaluation」
+  7. 🆕 publish 后注册为用户「我的能力」
 ```
 
 **项目目录结构（最大复用现有）：**
 
 ```text
-projects/supplier-evaluation/        ← 🟢 复用 project_agent 目录约定
-├── workflow.draft.json              ← 🆕 设计态 spec
+users/{user_id}/workflows/supplier-evaluation/
+├── workflow.draft.json              ← 🆕 设计态 spec（可由当前 workflow.json 演进）
 ├── workflow.published.json          ← 🆕 发布态 spec
+├── manifest.yaml                    ← 🆕 注册到「我的能力」
 ├── src/
 │   ├── state.py                     ← 🆕 工作流 State（基于 WorkflowState）
 │   ├── nodes/                       ← 🆕 节点代码
@@ -230,23 +238,28 @@ projects/supplier-evaluation/        ← 🟢 复用 project_agent 目录约定
     └── v1.1.0/
 ```
 
-### 3.2 发布态：注册为业务 Agent
+当前代码可先继续落在 `projects/{name}/`，但 spec / manifest 需要显式记录 `owner_user_id`、`visibility`、`forked_from`，避免长期把全局项目目录误当作用户资产模型。
+
+### 3.2 发布态：注册为「我的能力」
 
 ```yaml
-# agents/supplier-evaluation/config.yaml
-display_name: 供应商智能评估        ← 🟢 复用 agents 配置体系
-model: gpt-4o                       ← 🟢 复用 agents 模型选择
-system_prompt: |
-  你是供应商智能评估助手...          ← 🟢 复用 agents 系统提示
-project: supplier-evaluation        ← 🆕 关联工作流项目
-
-# 🆕 新增字段
-access:
-  roles: [user]
-  departments: [采购部, 供应链管理部]
+# users/{user_id}/workflows/supplier-evaluation/manifest.yaml
+name: supplier-evaluation
+display_name: 供应商智能评估
+type: workflow
+owner_user_id: u_123
+visibility: private                 # private / shared / public
+entrypoint: src.graphs.supplier_evaluation:make_supplier_evaluation_graph
+published_spec: workflow.published.json
+callable_as:
+  - tool
+  - skill
+enabled_for_agents:
+  - default                         # 默认个人助手
+  - procurement-assistant            # 用户自己的 custom agent
 ```
 
-发布后，`make_project_agent("supplier-evaluation", config)` 即可加载执行——**完全复用现有的 [`make_project_agent`](file:///Users/fengrunda/myWork/gitLab_unicom/智能体/deerflow-unicom-gd/backend/packages/harness/deerflow/agents/project_agent/agent.py#L37-L59) 动态加载机制。**
+发布后，当前用户的个人助手可以从「我的能力」中发现并调用该 workflow。复杂工作流仍可复用现有 [`make_project_agent`](file:///Users/fengrunda/myWork/gitLab_unicom/智能体/deerflow-unicom-gd/backend/packages/harness/deerflow/agents/project_agent/agent.py#L37-L59) / `load_project_graph()` 动态加载机制，但调用入口不再要求表现为一个单独业务 Agent。
 
 ### 3.3 运行态：主 Agent 确定执行
 
@@ -309,7 +322,7 @@ async def evaluate_v2_node(state: WorkflowState) -> dict:
     return {"subagent_results": results, "all_passed": all_passed}
 ```
 
-### 3.4 用户调用入口（零改动）
+### 3.4 用户调用入口（最小改动）
 
 ```text
 Web 工作区                  IM（飞书/企微）               Python SDK
@@ -317,20 +330,20 @@ Web 工作区                  IM（飞书/企微）               Python SDK
      ▼                           ▼                          ▼
 ────────────────── ─────────────────── ──────────────────────────
 assistant_id:       channel config:        DeerFlowClient(
-  supplier-          assistant_id:           agent_name=
-  evaluation          supplier-evaluation    "supplier-evaluation"
+  lead_agent          assistant_id:           agent_name=
+  + workflow name     lead_agent              "default/custom"
                     )                       )
 ────────────────── ─────────────────── ──────────────────────────
      │                           │                          │
      └───────────────────────────┼──────────────────────────┘
                                  ▼
-                    make_lead_agent(agent_name="supplier-evaluation")
+                    make_lead_agent(agent_name=<user selected agent>)
                                  │
                                  ▼
-                    make_project_agent("supplier-evaluation", config)
+                    lookup user's enabled workflows / manifest
                                  │
                                  ▼
-                    workflow_graph.compile()
+                    runner / workflow_graph.compile()
                                  │
                                  ▼
                     🟢 完整 Middleware 链自动生效
@@ -339,7 +352,7 @@ assistant_id:       channel config:        DeerFlowClient(
                     🟢 Checkpointer 自动持久化
 ```
 
-**三种入口都零改动**——业务 Agent 发布后，和 Lead Agent 一样只是多了个 `assistant_id` / `agent_name`。
+三种入口均可复用现有 Gateway / IM / Client。最小新增点是「我的能力」注册表与 workflow manifest 查找；执行时仍继承完整 middleware、thread、sandbox、memory 与 checkpointer。
 
 ---
 
@@ -382,20 +395,23 @@ assistant_id:       channel config:        DeerFlowClient(
 | `decompose_v2_node` | 替代 decompose_node，读 DAG 确定拆解 | 低 |
 | `evaluate_v2_node` | 增强 evaluate_node，支持结构化 pass_condition | 中 |
 | Codegen 引擎 | WorkflowSpec → nodes/*.py + graph.py + tests/ | 高 |
-| `project_agent` prompt 升级 | 生成结构化 WorkflowSpec 而非纯文本 | 中 |
-| Agent/Skills 商店 API + 前端 | manifest + 选用 + 审批 | 高 |
+| workflow builder prompt 升级 | 生成结构化 WorkflowSpec / patch，而非纯文本 | 中 |
+| 「我的能力」注册表 | manifest + publish/install/fork + enabled workflows | 中 |
+| Agent/Skills 商店 API + 前端 | 发现、分发、评分、审批（后续增强） | 高 |
 | Sandbox Manager | 预热池 + 按需分配 + 自动伸缩 | 高 |
-| RBAC 角色扩展 | admin / developer / user 权限检查 | 低 |
+| RBAC 角色扩展 | admin / developer / user 权限检查（企业后置） | 低 |
 
 ### 需修改的现有文件
 
 | 文件 | 改动 |
 |------|------|
-| `project_agent/graph.py` | decompose 节点增加 v2 分支判断 |
-| `project_agent/nodes.py` | 新增 decompose_v2_node |
-| `project_agent/agent.py` | `make_project_agent` 加载 v2 graph |
+| `workflow_frontend/server/main.py` | 增加 test / publish / manifest 注册 API |
+| `workflow_frontend/src/*` | Builder 显示 draft/published 状态与发布入口 |
+| `project_agent/graph.py` | 可选：decompose 节点增加 v2 分支判断 |
+| `project_agent/nodes.py` | 可选：新增 decompose_v2_node |
+| `project_agent/agent.py` | 复用 `load_project_graph` 加载已发布 graph |
 | `agents/factory.py` | 无需改动（动态加载已支持） |
-| `auth/models.py` | 新增 developer role |
+| `auth/models.py` | 可选：新增 developer role（企业后置） |
 | `config.yaml` schema | 新增 sandbox autoscaling 配置段 |
 
 ---
@@ -403,21 +419,20 @@ assistant_id:       channel config:        DeerFlowClient(
 ## 六、核心差异化总结
 
 ```
-                  当前 project_agent              新方案（Workflow Agent）
-                  ──────────────────              ──────────────────────
-执行模式          LLM 即兴演奏                    按谱演奏（已发布 DAG）
-子任务来源        decompose_node LLM 当场生成      workflow.published.json 确定拆解
-子任务内容        LLM 生成的 prompt               nodes/{node}.py 的 run()
-执行引擎          SubagentExecutor（🟢 复用）       SubagentExecutor（🟢 复用）
-并行调度          Send API + _run_subagents（🟢）  Send API + _run_subagents（🟢）
-评测              evaluate_node LLM（🟢 复用）     evaluate_v2: pass_condition（🆕）
-重试              prepare_retry 最多 2 次（🟢）    prepare_retry 最多 2 次（🟢）
-可复现性          ❌ 不稳定                        ✅ DAG 固定 → 输入相同 → 输出相同
-可测试性          ❌ 无法单独测子任务               ✅ 每个 nodes/*.py 独立单测
+                  当前 project_agent              新方案（个人助手 + Workflow Builder）
+                  ──────────────────              ───────────────────────────────
+创建主体          固定 project_agent 原型          用户当前个人助手调用 builder 能力
+编辑入口          workflow_frontend 原型           独立 Builder 作为一期正式编辑入口
+执行模式          LLM 即兴演奏 / 手写 graph         published workflow 按谱演奏
+子任务来源        decompose_node LLM 当场生成      workflow.published.json 或 runner/graph
+子任务内容        LLM 生成的 prompt               nodes/{node}.py / graph node / runner
+执行引擎          SubagentExecutor（🟢 复用）       SubagentExecutor / LangGraph（🟢 复用）
+可复现性          ❌ 通用 Agent 不稳定              ✅ 发布态 DAG/graph 固定
+可测试性          ❌ 无法单独测子任务               ✅ workflow smoke test + 节点单测
 可审计性          ❌ 难以追溯                      ✅ 节点级 trace
-业务入口          Gateway / IM / Client（🟢）      Gateway / IM / Client（🟢）
+业务入口          Gateway / IM / Client（🟢）      个人助手 / custom agent（🟢）
 
-核心价值：在 DeerFlow 成熟骨架之上，把「即兴演奏」升级为「按谱演奏」——这就是 Coze 编程式工作流在 DeerFlow 中的实现方式。
+核心价值：在 DeerFlow 成熟骨架之上，把「个人助手即兴处理」沉淀为「用户可编辑、可发布、可复用的工作流能力」。
 ```
 
 ---
@@ -429,3 +444,5 @@ assistant_id:       channel config:        DeerFlowClient(
 3. **节点级 trace 与可观测**：每个 subagent 执行的输入/输出/耗时/错误收集和展示。
 4. **人工审批节点**：是否需要支持中断等待人工确认的节点类型（可复用 ClarificationMiddleware 中断机制）。
 5. **子工作流复用**：一个工作流节点是否能作为另一个工作流的子节点（可复用 LangGraph subgraph 机制）。
+6. **我的能力注册表**：复用 skills 白名单，还是新增 workflows registry。
+7. **Chat 与 Builder 同步**：一期只做独立 Builder；后续是否做嵌入式侧边栏画布与实时同步。

@@ -2,13 +2,13 @@
 
 ## 背景
 
-在企业场景中，管理员/开发者通过 `project_agent` 创建了多个业务 Agent 和 Skills 后，普通用户需要有统一入口来发现、了解和选用这些能力。
+在新的工作流治理口径中，每个登录用户都可以通过个人助手创建、发布、分享和 fork workflow。商店不再是“管理员/开发者发布、普通用户选用”的唯一入口，而是 **Agent / Skill / Workflow 的发现、分发、安装和计量层**；审批、角色收窄与部门权限作为企业交付阶段的可选能力。
 
 核心需求：
 
 1. **商店式管理**：custom agent 和 skills 需要一个类似「应用商店」的管理界面。
 2. **按权限选用**：普通用户根据自身权限和业务需要，自主选择使用哪些 Agent / Skills。
-3. **Skills ≠ 工作流**：Skills 是面向任务的能力包（指令 + 工作流 + 最佳实践 + 工具）。通过 project_agent 创建的工作流可被封装为 Skills 的一部分，但 Skills 不等同于工作流。
+3. **Skills ≠ 工作流**：Skills 是面向任务的能力包（指令 + 工作流 + 最佳实践 + 工具）。workflow 可发布为用户「我的能力」，也可被封装为 Skill 的一部分，但 Skill 不等同于 workflow。
 
 ### 架构复用总览
 
@@ -33,33 +33,27 @@
 
 | 概念 | 定义 | 创建者 | 使用者 |
 |------|------|-------|--------|
-| **业务 Agent** | 面向具体业务场景的 Agent，内置工作流和 skills | 管理员/开发者（通过 project_agent） | 普通用户 |
-| **Skill** | 面向任务的能力包（指令、工作流、最佳实践、工具） | 管理员/开发者 | Agent（运行时加载）；用户（选择启用） |
-| **工作流** | 业务 Agent 内部的节点 DAG，每个节点为 Python 文件 | 管理员/开发者（通过 project_agent + 画布） | 业务 Agent（运行时执行） |
+| **个人助手 / Custom Agent** | 用户日常使用的助手，可加载 SOUL、skills、tool groups 和 workflows | 每个用户 | 创建者自己；分享后其他用户 fork/install |
+| **Skill** | 面向任务的能力包（指令、工作流、最佳实践、工具） | 每个用户或系统 | Agent（运行时加载）；用户（选择启用） |
+| **工作流** | 用户拥有的可执行流程资源，可发布为 callable workflow，可选包装为 Skill/App | 每个用户（通过个人助手 + workflow builder + 独立 Builder） | 个人助手 / custom agent（运行时调用） |
 
 ### 关系说明
 
 ```text
-业务 Agent
-  ├── 系统提示词
-  ├── 模型选择
+用户个人助手 / Custom Agent
+  ├── SOUL.md / 系统提示词
+  ├── 模型与工具组
   ├── Skills（可多个）
-  │     ├── Skill A：数据分析
-  │     │     ├── SKILL.md（指令、最佳实践）
-  │     │     ├── 工作流（通过 project_agent 创建）
-  │     │     │     ├── nodes/load_data.py
-  │     │     │     ├── nodes/analyze.py
-  │     │     │     └── nodes/generate_chart.py
-  │     │     └── tools/
-  │     └── Skill B：报告生成
-  │           ├── SKILL.md
-  │           └── 工作流
-  │                 ├── nodes/collect_results.py
-  │                 └── nodes/format_report.py
-  └── Tools（工具组）
+  ├── Workflows（我的能力，可多个）
+  │     ├── Workflow A：日报
+  │     │     ├── workflow.published.json
+  │     │     ├── manifest.yaml
+  │     │     └── runner / graph
+  │     └── Workflow B：供应商评估
+  └── Tools（浏览器、代码编辑器、文档编辑器、workflow builder 等）
 ```
 
-一个关键理解：**工作流是通过 project_agent 创建的节点 DAG，它归属于某个 Skill。Skill 是更上层的概念，包含指令、工具和工作流。用户选用的是 Agent，Agent 内部加载了 Skills，Skills 内部包含了工作流。**
+一个关键理解：**工作流是用户资产，不必先归属于某个业务 Agent 或 Skill**。workflow 可以直接进入「我的能力」，被个人助手调用；也可以包装为 Skill 或 App，用于更正式的分发、安装和商店展示。
 
 ## 商店架构
 
@@ -143,12 +137,14 @@ rating: 4.5
 
 ### Agent 生命周期
 
+> 该生命周期偏企业商店 / 公共 Agent 管理；个人 workflow 的默认生命周期见 [workflow-governance.md](workflow-governance.md)，不强制 review 审批。
+
 ```text
 draft（草稿）
-  -> 管理员/开发者编辑中
+  -> owner 编辑中
 
 review（审批中）
-  -> 提交审批，等待管理员审核
+  -> 提交审批，等待管理员审核（企业可选）
 
 published（已发布）
   -> 对授权用户可见、可用

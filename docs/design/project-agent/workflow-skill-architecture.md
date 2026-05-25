@@ -1,9 +1,10 @@
 # Project Agent Workflow Skill Architecture
 
-> **弃用说明（2026-05）**：本文档描述的是旧方案（workflow skill + custom agent 调用），
-> 已被新方案取代。新主路线为**节点独立 Python 文件 + 业务 Agent + 主 Agent 拆子任务 + subagent 执行**。
+> **状态说明（2026-05）**：本文档描述的是「workflow skill + custom agent 调用」路线。
+> 该路线不再是唯一主线，但其中 **workflow skill 作为 published workflow 的包装形态** 仍可复用。
+> 当前新主路线为：**个人助手调用 workflow builder → 独立 Workflow Builder 编辑 → publish → 注册到「我的能力」→ 个人助手 / custom agent 调用**。
 > 请参阅 [`workflow-agent-architecture.md`](workflow-agent-architecture.md)。
-> 本文保留作为历史参考。
+> 本文保留作为 workflow skill 包装方案参考。
 
 ## 背景
 
@@ -15,22 +16,25 @@
 
 ## 核心结论
 
-推荐路线：
+推荐路线（按当前口径修订）：
 
 ```text
-project_agent
+个人助手 Agent
+  -> 调用 workflow builder / workflow-code-generator
   -> 协助设计 / 编辑 / 维护 WorkflowSpec
+  -> 独立 Workflow Builder 画布编辑
   -> 生成或维护确定性执行产物
-  -> 发布为 workflow skill
-  -> custom agent 按场景加载该 skill
-  -> 业务系统通过 Gateway / IM / DeerFlowClient 调用 custom agent
+  -> publish 为 callable workflow
+  -> 注册到「我的能力」
+  -> 可选包装为 workflow skill
+  -> 个人助手 / custom agent 按场景调用
 ```
 
-因此，`project_agent` 的定位应从“业务工作流执行 Agent”调整为：
+因此，`project_agent` 的定位应从“业务工作流执行 Agent / 唯一创建主体”调整为：
 
 ```text
-Workflow Builder Agent:
-面向用户和开发者的工作流设计、维护、发布助手。
+Workflow Builder Capability:
+被用户当前个人助手调用的工作流设计、维护、发布能力。
 ```
 
 业务运行期的入口则应优先复用 DeerFlow 已有的：
@@ -120,12 +124,13 @@ Coze 对 DeerFlow 最值得借鉴的是产品与 schema 分层，而不是 Go/Ei
 新的目标链路：
 
 ```text
-自然语言需求
-  -> project_agent 生成 WorkflowSpec 草案
-  -> workflow_frontend 画布编辑
-  -> project_agent 生成或更新 workflow skill
+个人助手对话
+  -> workflow builder 生成 WorkflowSpec 草案
+  -> workflow_frontend 独立 Builder 编辑
+  -> workflow builder 生成或更新 runner / graph / skill 包装
   -> 用户 review / test / publish
-  -> custom agent 在业务场景中调用该 skill
+  -> 注册到「我的能力」
+  -> 个人助手 / custom agent 在业务场景中调用该 workflow
   -> 产出报告、文件、结构化数据或业务动作结果
 ```
 
@@ -261,7 +266,7 @@ backend/langgraph.json
 - 一个 workflow skill 能被 skills 系统加载。
 - custom agent 可通过 skills 白名单只启用该工作流。
 
-### Phase 2：project_agent 生成 WorkflowSpec
+### Phase 2：workflow builder 生成 WorkflowSpec
 
 交付：
 
@@ -317,15 +322,16 @@ backend/langgraph.json
 
 ## 对既有文档的口径修正
 
-已有文档中提到的“一节点一 Python 文件”和“Python graph codegen”应降级为 **一种可选实现策略**，而不是 `project_agent` 的核心目标。
+已有文档中提到的“一节点一 Python 文件”和“Python graph codegen”应降级为 **一种可选实现策略**，而不是 workflow builder 的唯一目标。
 
 新的主线应是：
 
 ```text
 Agent-assisted workflow building
   -> WorkflowSpec
-  -> Workflow Skill
-  -> Custom Agent 使用
+  -> Published Workflow / Workflow Skill
+  -> 我的能力
+  -> 个人助手 / Custom Agent 使用
   -> 业务系统接入
 ```
 
@@ -339,11 +345,12 @@ Agent-assisted workflow building
 
 ## 最终建议
 
-`project_agent` 不应被设计成“每次直接替用户执行所有业务工作流”的入口，而应成为 DeerFlow 内部的 **Workflow Builder**：
+`project_agent` 不应被设计成“每次直接替用户执行所有业务工作流”的入口，也不应成为唯一的创建主体；它应成为 DeerFlow 内部的 **Workflow Builder Capability**：
 
 ```text
-它帮助用户把业务经验沉淀成 workflow skill；
-custom agent 负责在真实业务场景中识别并调用这些 skill；
+它被用户当前个人助手调用，帮助用户把业务经验沉淀成 published workflow；
+published workflow 注册到「我的能力」，可选包装成 workflow skill；
+个人助手 / custom agent 负责在真实业务场景中识别并调用这些 workflow；
 Gateway、IM 和 DeerFlowClient 负责把能力接入业务系统。
 ```
 

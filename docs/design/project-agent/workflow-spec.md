@@ -1,22 +1,24 @@
 # Project Agent Workflow Spec
 
+> **精简主文档**见 [`../workflow-tool/spec.md`](../workflow-tool/spec.md)。本文保留完整版与历史细节。
+
 ## 背景
 
-当前分支引入了 `project_agent`、`workflow_frontend` 和 `projects/competitive_analysis`，意图把 DeerFlow 从通用超级智能体扩展为面向业务工作流的协同编排系统。
+当前分支引入了 `project_agent`、`workflow_frontend`、`workflow-code-generator` skill 和多个 `projects/` 样例，意图把 DeerFlow 从通用超级智能体扩展为面向个人与团队工作的 workflow 构建、编辑、发布和调用系统。
 
-本 spec 记录一个目标方向：`project_agent` 不应只是运行时动态拆任务的 Agent，而应成为类似 Coze 编程式工作流的人机协同编排助手。用户可以用自然语言生成或调整工作流，也可以在 Web 画布中手动编辑节点和连线；最终工作流应固化为可版本管理、可测试、可审计、可复现的确定流程。
+本 spec 记录一个目标方向：工作流创建不应绑定为一个中心化 `project_agent`，而应成为**每个用户的个人助手 Agent 可调用的 workflow builder 能力**。用户在日常工作中通过对话发起创建，系统生成 workflow draft、`workflow.json` 和初始 runner/graph；用户直接在独立 Workflow Builder 画布中编辑节点和连线，也可以继续通过对话修改；最终工作流发布为用户「我的能力」，可被当前个人助手或用户自己的 custom agent 调用。
 
-最新推荐路线见 [`workflow-agent-architecture.md`](workflow-agent-architecture.md)。工作流节点固化为独立 Python 文件，由业务 Agent（主 Agent）拆解子任务后派发 subagent 执行，配合评测与重试机制。
+最新推荐路线见 [`workflow-agent-architecture.md`](workflow-agent-architecture.md)。一期不要求 Chat 内嵌画布，而是直接复用当前 `workflow_frontend` 独立 Builder 打通创建、编辑、测试、发布闭环；后续再演进为 Chat + 侧边栏画布的联动体验。
 
 ## 目标愿景
 
-`project_agent` 的目标是支持复杂业务工作流的低代码/代码化协同开发：
+workflow builder 的目标是支持复杂业务工作流的低代码/代码化协同开发：
 
-1. 用户用自然语言描述业务目标、输入输出、节点职责和异常路径。
-2. Agent 根据描述生成工作流草案，包括节点、边、输入输出、节点类型、依赖关系和执行策略。
-3. Web 页面以 DAG 方式展示工作流，用户可以拖拽、增删、编辑节点和连线。
-4. 用户可以继续用自然语言让 Agent 修改已有工作流，例如“把市场调研拆成政策和竞品两个节点”。
-5. 工作流最终发布为可复用的业务能力，优先形态是 workflow skill，必要时再生成 Python runner 或 LangGraph graph。
+1. 用户用个人助手 Agent 描述业务目标、输入输出、节点职责和异常路径。
+2. 个人助手调用 workflow builder / workflow-code-generator 生成工作流草案，包括节点、边、输入输出、节点类型、依赖关系和执行策略。
+3. 独立 Workflow Builder 页面以 DAG 方式展示工作流，用户可以拖拽、增删、编辑节点和连线。
+4. 用户可以继续用自然语言让个人助手修改已有工作流，例如“把市场调研拆成政策和竞品两个节点”。
+5. 工作流最终发布为用户「我的能力」，优先形态是 callable manifest + workflow skill / runner / LangGraph graph。
 6. 运行时执行已发布的确定流程，而不是每次让 LLM 即兴判断主流程。
 
 核心原则是：**AI 参与工作流开发和维护，但业务流程执行应尽量确定化。**
@@ -30,6 +32,8 @@
 - 不把任意 React Flow JSON 直接作为生产执行源。
 - 不允许未校验的前端节点定义直接执行任意代码。
 - 不把所有业务节点都设计成纯 LLM 节点。
+- 不要求第一期实现 Chat 内嵌侧边栏画布；独立 Workflow Builder 页面即可。
+- 不要求第一期实现多人实时协作、商店评分、强审批和复杂组织权限。
 - 不要求第一版支持复杂循环、人工审批、长事务补偿等高级编排能力。
 
 ## 当前实现概览
@@ -146,36 +150,45 @@ POST /api/chat/stream
 - 有一个手写业务 graph：`competitive_analysis`。
 - 前端能编辑和保存 React Flow 风格的 `nodes/edges`。
 - 前端 chat 能识别 Agent 回复中的 `nodes/edges` JSON 并加载到画布。
+- `workflow_frontend` 已具备独立 Builder 的基础形态，支持项目列表、加载、保存与 Chat 代理。
+- `workflow-code-generator` skill 已能生成 `projects/{name}/`、`workflow.json` 和 `src/graphs/*.py` 形态的完整样例项目。
 
 ### 未实现
 
 - 后端不读取 `projects/{name}/workflow.json`。
 - 后端不会把 `workflow.json` 编译为 LangGraph。
 - 前端画布编辑不会影响真实执行图。
-- `project_agent` 没有稳定输出可执行 workflow spec。
+- 个人助手还没有稳定地调用 workflow builder 输出可执行 workflow spec / patch。
 - 没有 `workflow.json -> Python nodes/graph` 的代码生成器。
 - 没有节点级 input/output schema 校验。
 - 没有草稿态、已生成态、已发布态的生命周期。
 - 没有将用户自然语言修改映射为对已有 workflow spec 的结构化 patch。
+- 发布后尚未注册为用户「我的能力」，个人助手不能稳定按名称调用 published workflow。
 
 因此，当前更准确的定位是：
 
 ```text
 后端：工作流 Agent 原型 + Python 项目图加载机制
-前端：工作流可视化编辑器原型
-中间：只通过 workflow.json 做画布持久化，尚未接入执行
+前端：独立 Workflow Builder 原型（已可编辑 / 保存 workflow.json）
+中间：通过 workflow.json 做画布持久化，尚未接入发布与执行
 ```
 
 而目标形态应是：
 
 ```text
-自然语言需求
-  -> Agent 生成 workflow spec
-  -> Web 画布人机协同编辑
-  -> Agent 生成 Python nodes/graph
-  -> 后端加载 Python graph
-  -> 确定性执行
+用户使用个人助手
+  -> 说：帮我做一个日报工作流
+  -> 个人助手调用 workflow builder / workflow-code-generator
+  -> 生成 workflow draft + workflow.json + 初始 runner/graph
+  -> 自动打开或返回独立 Workflow Builder 链接
+  -> 用户在画布中编辑节点/连线，也可继续通过对话调整
+  -> 保存 draft，测试运行
+  -> publish
+  -> 注册为用户「我的能力」
+  -> 当前个人助手后续可直接调用该 workflow
 ```
+
+分享 / fork / install 时只复制流程、spec、代码和 manifest，**不复制作者的数据上下文**。执行始终使用调用者自己的 sandbox、memory、uploads 和 credentials。
 
 ## 为什么要固化为确定流程
 
@@ -200,6 +213,33 @@ POST /api/chat/stream
 
 ## 目标架构
 
+### 0. 个人助手 + Workflow Builder 能力层
+
+工作流创建的入口是用户当前正在使用的个人助手 Agent，而不是固定的 `project_agent`。`project_agent` 可以继续作为底层实现名称存在，但产品与架构口径应改为 **workflow builder capability**：
+
+> 工具自身的分层设计见 [workflow-tool-architecture.md](workflow-tool-architecture.md)：DeerFlow 是 Agent 基座，Workflow Builder 是工具 / 应用模块，核心 workflow domain service 不应依赖某个 Agent 图。
+
+```text
+User
+  -> Personal Assistant Agent（默认 lead_agent + user_id 上下文）
+      -> 调用 workflow builder / workflow-code-generator
+      -> 生成或修改 workflow draft
+      -> 打开独立 Workflow Builder 编辑
+      -> publish 后加入「我的能力」
+```
+
+DeerFlow 现有 custom agent 模型与此兼容：同一个用户可以有多个 custom agent，它们本质上是同一 `lead_agent` 图在不同 `agent_name`、`SOUL.md`、`config.yaml`、skills/tool/model 白名单下运行。workflow 发布后可以被默认个人助手调用，也可以被用户自己的 custom agent 通过 skills / callable manifest 白名单启用。
+
+一期交互直接复用当前 `workflow_frontend` 独立页面，不要求 Chat 内嵌画布：
+
+```text
+Chat 创建/修改意图
+  -> 生成 draft 与 workflow.json
+  -> 返回 /workflow-builder?workflow_id=... 或 ?project=...
+  -> 用户在独立 Builder 保存
+  -> Chat 或 Builder 发起 test / publish
+```
+
 ### 1. Workflow Spec 层
 
 需要定义一个后端可理解的 workflow spec。它可以继续使用 `workflow.json`，但必须从 UI 状态升级为业务语义明确的规范。
@@ -210,7 +250,12 @@ POST /api/chat/stream
 {
   "version": "1",
   "project": "competitive_analysis",
-  "metadata": {},
+  "metadata": {
+    "owner_user_id": "u_123",
+    "visibility": "private",
+    "collaborators": [],
+    "forked_from": null
+  },
   "nodes": [],
   "edges": [],
   "ui": {}
@@ -253,9 +298,22 @@ POST /api/chat/stream
 
 ### 2. 发布层
 
-Agent 生成或修改 workflow spec 后，系统应发布可复用的 workflow skill。Python 代码生成仍然可用，但它是 workflow skill 的内部执行实现之一，而不是对外集成形态。
+个人助手调用 workflow builder 生成或修改 workflow spec 后，系统应发布可复用的 callable workflow。Python 代码生成仍然可用，但它是 workflow skill / runner 的内部执行实现之一，而不是唯一对外集成形态。
 
 推荐发布结构：
+
+```text
+users/{owner_user_id}/workflows/{workflow_name}/
+├── workflow.draft.json
+├── workflow.published.json
+├── manifest.yaml              # 注册到「我的能力」的 callable manifest
+├── src/
+│   └── graphs/
+│       └── {workflow_name}.py
+└── tests/
+```
+
+如需让既有 skills 系统发现，也可以额外生成 skill 包装层：
 
 ```text
 skills/custom/{workflow_name}/
@@ -304,7 +362,7 @@ async def node_name(state: WorkflowState, config: RunnableConfig) -> dict:
 
 前端画布应编辑 workflow spec，而不只是 UI JSON。
 
-需要支持：
+一期直接使用独立 Workflow Builder 页面，避免把完整画布嵌入 Chat 作为首要前提。需要支持：
 
 - 选择项目。
 - 加载草稿 workflow spec。
@@ -312,21 +370,23 @@ async def node_name(state: WorkflowState, config: RunnableConfig) -> dict:
 - 编辑节点输入输出、prompt、工具名、subagent 类型、超时、重试等。
 - 校验断开的边、缺失输入、循环依赖。
 - 保存草稿。
-- 请求 Agent 根据用户描述修改当前 spec。
+- 请求个人助手 / workflow builder 根据用户描述修改当前 spec。
 - 请求后端生成/更新 Python 代码。
 - 显示代码生成 diff。
 - 发布工作流版本。
 
+后续增强再考虑 Chat 内嵌侧边栏画布、实时同步、多人协作和冲突处理。
+
 ### 4. Runtime 层
 
-运行时优先由 custom agent 识别并调用 workflow skill：
+运行时优先由用户当前个人助手识别并调用「我的能力」中的 published workflow：
 
 ```text
-业务系统
+用户请求
   -> Gateway / IM / DeerFlowClient
-  -> assistant_id 或 agent_name
-  -> lead_agent/custom_agent
-  -> workflow skill
+  -> lead_agent 或 user custom agent
+  -> 查询「我的能力」/ enabled workflows
+  -> 调用 published workflow
   -> 确定性 runner 或 LangGraph graph
 ```
 
@@ -338,7 +398,7 @@ projects/{project}/src/graphs/workflow_graph.py
 
 执行优先级建议：
 
-1. 如果存在已发布 workflow skill，则由 custom agent 调用 skill。
+1. 如果用户「我的能力」中存在已发布 workflow，则由当前个人助手调用该 workflow。
 2. 如果 skill 内部存在 Python runner 或 LangGraph graph，则执行对应固化产物。
 3. 如果只有 workflow spec，则拒绝生产执行，并提示先发布。
 4. 仅在开发模式下允许从 spec 临时解释执行。
@@ -350,14 +410,15 @@ projects/{project}/src/graphs/workflow_graph.py
 ### 新建工作流
 
 ```text
-用户描述业务目标
-  -> project_agent 生成 workflow spec 草案
-  -> 前端画布展示
-  -> 用户编辑
-  -> project_agent 根据编辑后 spec 生成 workflow skill
-  -> 用户 review diff
-  -> 运行校验
+用户使用个人助手描述业务目标
+  -> 个人助手调用 workflow builder / workflow-code-generator
+  -> 生成 workflow draft + workflow.json + 初始 runner/graph
+  -> 返回独立 Workflow Builder 链接
+  -> 用户在 Builder 画布编辑，也可继续通过对话调整
+  -> 保存 draft
+  -> 测试运行 / smoke test
   -> 发布
+  -> 注册到用户「我的能力」
 ```
 
 ### 修改工作流
@@ -365,9 +426,9 @@ projects/{project}/src/graphs/workflow_graph.py
 ```text
 用户提出修改需求
   -> 系统加载当前 workflow spec 和代码摘要
-  -> project_agent 生成结构化 patch
-  -> 前端展示变更
-  -> 用户确认或手动修正
+  -> 个人助手调用 workflow builder 生成结构化 patch
+  -> Builder 或 Chat 展示变更
+  -> 用户确认或在独立画布手动修正
   -> 重新生成受影响 skill 产物
   -> 运行测试
   -> 发布新版本
@@ -377,34 +438,67 @@ projects/{project}/src/graphs/workflow_graph.py
 
 ```text
 用户触发已发布 workflow
-  -> Gateway / IM / DeerFlowClient 调用 custom agent
-  -> custom agent 根据场景选择 workflow skill
-  -> workflow skill 调用确定 runner 或 LangGraph graph
+  -> Gateway / IM / DeerFlowClient 调用当前个人助手或 custom agent
+  -> Agent 从「我的能力」中选择 published workflow
+  -> workflow 调用确定 runner 或 LangGraph graph
   -> 返回结果、artifact、日志、节点状态
 ```
 
+### 分享 / fork / install
+
+```text
+owner 发布 workflow
+  -> 设置 visibility: private / shared / public
+  -> 其他用户 fork / install
+  -> 复制 workflow spec、代码产物和 manifest 到自己的命名空间
+  -> 执行时使用调用者自己的 sandbox / memory / uploads / credentials
+```
+
+共享 workflow 共享的是流程和代码，不共享作者的数据上下文。
+
 ## 与当前实现的映射
+
+> 详细 commit 级对照见 [implementation-status.md](implementation-status.md)（2026-05-25 快照）。
 
 | 目标模块 | 当前位置 | 当前状态 |
 | --- | --- | --- |
 | LangGraph 入口 | `backend/langgraph.json` | 已注册 `project_agent`、`competitive_analysis_agent` |
-| 通用 workflow graph | `backend/packages/harness/deerflow/agents/project_agent/graph.py` | 已实现固定流程 |
-| 通用 workflow 节点 | `backend/packages/harness/deerflow/agents/project_agent/nodes.py` | 已实现拆解、规划、执行、评估、汇总 |
-| 项目动态加载 | `make_project_agent()` / `load_project_graph()` | 已实现 Python module 加载 |
-| 业务示例 | `projects/competitive_analysis/` | 已有手写 Python graph |
-| 前端画布 | `workflow_frontend/` | 已实现编辑和保存 UI JSON |
-| workflow spec | `projects/{name}/workflow.json` | 目前只是 React Flow JSON |
+| 通用 workflow graph | `agents/project_agent/graph.py` | 已实现（规划/拆解/执行/评估流水线） |
+| 工作流代码生成 | `skills/public/workflow-code-generator/` + `prompts.py` | **已实现**：子任务读 skill，生成完整 `projects/{name}/` |
+| 项目脚手架 | `nodes.py` `_scaffold_project()` | **已实现**：目录结构 + 种子 `workflow.json` |
+| 业务项目样例 | `projects/ai_news_daily`, `travel_planner`, `competitive_analysis` | **已实现**（`src/graphs/*.py` + `workflow.json`） |
+| 前端画布 + Chat | `workflow_frontend/` | **已实现**：编辑/保存 JSON、流式 Chat、**POST 创建 project** |
+| workflow 持久化形态 | `projects/{name}/workflow.json` | **MVP**：React Flow JSON（非 draft/published 双文件） |
+| 一期产品闭环 | 个人助手 + 独立 `workflow_frontend` Builder | **部分实现**：已有创建/编辑基础，缺 test/publish/我的能力 |
+| 目标：一节点一 py | `projects/*/src/nodes/` | **未作为默认**；目标架构仍见 [python-node-design.md](python-node-design.md) |
+| decompose_v2（读 published DAG） | — | **未实现**；仍为 LLM `decompose` |
 | workflow skill 发布 | `skills/custom/{name}/` | 未实现 |
-| spec 到代码生成 | 无 | 可选实现，未实现 |
-| spec 到 LangGraph 执行 | 无 | 未实现 |
-| 用户自然语言 patch | 无 | 未实现 |
-| 发布/版本化 | 无 | 未实现 |
+| 用户自然语言 patch spec | Chat → JSON 落盘 | **部分**：Chat 可写入整图 JSON，无结构化 patch 协议 |
+| 发布/版本化 / fork / share | — | 未实现（治理见 [workflow-governance.md](workflow-governance.md)） |
 
 ## 建议里程碑
 
-### Milestone 1：明确 Spec 与保存协议
+### Milestone 1：个人助手 + 独立 Builder MVP 闭环
 
-目标：让 `workflow.json` 成为可校验的业务 workflow spec。
+目标：直接复用当前 `workflow_frontend`，让用户从个人助手发起创建，在独立 Builder 中编辑，保存后能测试并发布到「我的能力」。
+
+交付：
+
+- Chat 创建 workflow draft，并返回独立 Builder 链接。
+- Builder 加载、编辑、保存 `workflow.json`。
+- workflow-code-generator 生成或绑定 `src/graphs/*.py` runner。
+- 提供最小 test / smoke run 入口。
+- publish 后生成 callable manifest，并注册到当前用户「我的能力」。
+
+验收：
+
+- 用户从 Chat 发起创建，能得到一个可打开、可编辑、可保存的 workflow。
+- 保存后的 workflow 能绑定一个可运行的 Python graph / runner。
+- 用户再次对个人助手说“运行我的日报工作流”，助手能调用 published workflow。
+
+### Milestone 2：明确 Spec 与保存协议
+
+目标：让 `workflow.json` 成为可校验的业务 workflow spec，而不只是 React Flow UI JSON。
 
 交付：
 
@@ -418,9 +512,9 @@ projects/{project}/src/graphs/workflow_graph.py
 - 任意 `workflow.json` 可被后端校验。
 - 缺失输入、未知节点类型、非法边能返回明确错误。
 
-### Milestone 2：Agent 生成 workflow spec
+### Milestone 3：对话 patch + codegen 更新
 
-目标：让 `project_agent` 稳定输出结构化 workflow spec，而不是普通总结文本。
+目标：让个人助手稳定基于现有 draft 生成结构化 patch，并更新受影响的 runner / graph。
 
 交付：
 
@@ -428,31 +522,32 @@ projects/{project}/src/graphs/workflow_graph.py
 - 新增 patch prompt：根据用户修改请求修改现有 spec。
 - 前端 chat 调用时携带当前 spec。
 - Agent 返回结构化 JSON 或 patch。
+- 代码生成器支持增量更新或全量重写后展示 diff。
 
 验收：
 
 - 用户描述“做一个竞品分析工作流”，Agent 能生成可加载的 spec。
 - 用户描述“新增政策研究节点”，Agent 能基于现有 spec 生成 patch。
 
-### Milestone 3：Spec 到 workflow skill 发布
+### Milestone 4：Spec 到 workflow skill / callable manifest 发布
 
-目标：将 spec 固化为可被 custom agent 调用的 workflow skill。
+目标：将 spec 固化为可被个人助手 / custom agent 调用的 workflow。
 
 交付：
 
 - 生成 `SKILL.md`。
 - 生成 `workflow.published.json`。
-- 生成 `manifest.json`。
+- 生成 callable `manifest.yaml` / `manifest.json`。
 - 生成确定性 runner 或引用已有 graph。
 - 输出发布 diff 给用户审核。
 
 验收：
 
-- skill 可被 skills 系统加载。
-- custom agent 可通过 skills 白名单启用该工作流。
-- 调用 skill 能产出稳定交付物。
+- published workflow 出现在当前用户「我的能力」。
+- 个人助手可按名称调用该工作流。
+- custom agent 可通过 skills / workflow 白名单启用该工作流。
 
-### Milestone 4：运行与测试
+### Milestone 5：运行与测试
 
 目标：让生成后的项目 graph 可稳定执行。
 
@@ -469,9 +564,9 @@ projects/{project}/src/graphs/workflow_graph.py
 - 节点失败能定位到具体节点。
 - 修改 workflow 后能回归测试。
 
-### Milestone 5：发布与版本管理
+### Milestone 6：发布、版本与分享
 
-目标：支持草稿、预览、发布和回滚。
+目标：支持草稿、预览、发布、回滚、fork / share / install。
 
 交付：
 
@@ -479,11 +574,13 @@ projects/{project}/src/graphs/workflow_graph.py
 - 发布前校验。
 - 版本号与变更记录。
 - 回滚机制。
+- `owner_user_id`、`visibility`、`collaborators`、`forked_from`、`installed_by`。
 
 验收：
 
 - 生产执行只使用 published graph。
 - 用户可以查看每次发布的变更。
+- fork / install 只复制流程与代码，执行时使用调用者自己的 sandbox / memory / uploads / credentials。
 
 ## 设计风险
 
@@ -534,24 +631,26 @@ React Flow 的字段不能直接等同于执行 DSL。
 2. 是否允许开发模式下解释执行 workflow spec，还是必须先 codegen？
 3. workflow skill 的第一版 runner 应该是脚本、LangGraph graph，还是两者都支持？
 4. 节点输入输出 schema 使用 Pydantic、TypedDict 还是 JSON Schema？
-5. 生成代码是否由 `project_agent` 直接写入仓库，还是只生成 patch 等用户确认？
+5. 生成代码是否由 workflow builder 直接写入用户 workflow 命名空间，还是只生成 patch 等用户确认？
 6. 前端编辑后的 workflow 是否需要自动触发代码生成，还是手动点击“生成代码/发布”？
 7. 是否需要支持人工审批节点、循环节点、批处理节点、长事务节点？
+8. 「我的能力」应复用 skills 白名单，还是新增 workflows registry？
+9. 个人助手调用 workflow 时，工具形态应表现为 tool、skill、app，还是统一的 callable manifest？
 
 ## 推荐结论
 
-`project_agent` 应定位为 **业务工作流编排助手**，而不是普通执行 Agent。
+工作流创建应定位为 **个人助手可调用的 workflow builder 能力**，而不是一个中心化 `project_agent` 独占的创建入口。
 
-它的核心价值不是“每次临时规划并执行任务”，而是帮助用户把复杂业务流程逐步沉淀为可维护、可调用的 workflow skill：
+它的核心价值不是“每次临时规划并执行任务”，而是帮助用户把日常工作中的重复流程逐步沉淀为可维护、可发布、可分享、可调用的 workflow：
 
 ```text
-自然语言需求
-  -> workflow spec
-  -> Web 协同编辑
-  -> workflow skill
-  -> 测试与发布
-  -> custom agent 调用
+个人助手对话
+  -> workflow builder / workflow-code-generator
+  -> workflow draft + 独立 Builder 编辑
+  -> 测试与 publish
+  -> 注册到「我的能力」
+  -> 个人助手 / custom agent 调用
   -> 确定性执行与交付物产出
 ```
 
-当前实现已经有了通用 Agent、skills、custom agent、项目加载、竞品分析样例和前端画布，但缺少 `workflow spec -> workflow skill -> custom agent 调用` 的发布闭环。这应是后续建设的主线；`workflow.json -> Python graph` 可作为复杂 workflow 的内部执行实现继续保留。
+当前实现已经有了通用 Agent、per-user custom agent、skills、项目加载、样例项目和独立 `workflow_frontend` 画布。因此一期不必退回纯对话 MVP，可以直接建设 **个人助手 + 独立 Workflow Builder + 发布到「我的能力」** 的最小闭环。`workflow.json -> Python graph` 可作为复杂 workflow 的内部执行实现继续保留；Chat 内嵌侧边栏画布、多人协作与商店化属于后续增强。
