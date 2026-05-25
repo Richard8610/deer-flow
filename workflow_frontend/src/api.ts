@@ -103,6 +103,18 @@ export interface Skill {
   category: 'public' | 'custom';
 }
 
+export interface Model {
+  name: string;
+  display_name: string | null;
+}
+
+export async function fetchModels(): Promise<Model[]> {
+  const r = await fetch('/api/models');
+  if (!r.ok) return [];
+  const data = (await r.json()) as { models: Model[] };
+  return data.models;
+}
+
 export async function fetchSkills(): Promise<Skill[]> {
   const r = await fetch('/api/skills');
   if (!r.ok) return [];

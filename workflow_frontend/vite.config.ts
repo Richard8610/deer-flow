@@ -17,6 +17,10 @@ export default defineConfig({
         target: 'http://localhost:8002',
         changeOrigin: true,
       },
+      '/api/models': {
+        target: 'http://localhost:8002',
+        changeOrigin: true,
+      },
     },
   },
 });

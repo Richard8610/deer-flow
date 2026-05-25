@@ -51,7 +51,7 @@ async def _gateway() -> httpx.AsyncClient:
     try:
         r = await _gw_client.post(
             f"{GW_BASE}/api/v1/auth/login/local",
-            json={"email": GW_EMAIL, "password": GW_PASSWORD},
+            data={"username": GW_EMAIL, "password": GW_PASSWORD},
         )
         r.raise_for_status()
         print(f"[chat] authenticated with gateway as {GW_EMAIL}")
@@ -101,6 +101,22 @@ def save_workflow(name: str, body: dict[str, Any]) -> dict[str, Any]:
     wf_file = project / WORKFLOW_FILE
     wf_file.write_text(json.dumps(body, indent=2, ensure_ascii=False), encoding="utf-8")
     return {"ok": True, "path": str(wf_file.relative_to(PROJECTS_DIR.parent))}
+
+
+# ── Models list (proxied from gateway) ─────────────────────────────────────
+
+
+@app.get("/api/models")
+async def list_models() -> dict[str, Any]:
+    """Proxy gateway /api/models and return the models list."""
+    try:
+        gw = await _gateway()
+        r = await gw.get(f"{GW_BASE}/api/models")
+        r.raise_for_status()
+        return r.json()
+    except Exception as exc:
+        print(f"[models] gateway error: {exc}")
+        return {"models": []}
 
 
 # ── Skills list ────────────────────────────────────────────────────────────

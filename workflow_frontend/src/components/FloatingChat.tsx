@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { fetchSkills, type Skill } from '../api';
+import { fetchSkills, fetchModels, type Skill, type Model } from '../api';
 
 const TOOLS = ['Calculator', 'Web Search', 'Image Generator'];
 const ACCEPT = '.pdf,.txt,.docx,.md';
@@ -18,6 +18,8 @@ export function FloatingChat() {
   const [messages, setMessages]           = useState<Msg[]>([]);
   const [input, setInput]                 = useState('');
   const [file, setFile]                   = useState<File | null>(null);
+  const [models, setModels]               = useState<Model[]>([]);
+  const [selectedModel, setSelectedModel] = useState('');
   const [skills, setSkills]               = useState<Skill[]>([]);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [skillPanelOpen, setSkillPanelOpen] = useState(true);
@@ -29,8 +31,12 @@ export function FloatingChat() {
   const inputRef     = useRef<HTMLTextAreaElement>(null);
   const skillPanelRef = useRef<HTMLDivElement>(null);
 
-  // Initial load — auto-select all public skills
+  // Initial load — models + skills
   useEffect(() => {
+    fetchModels().then((loaded) => {
+      setModels(loaded);
+      if (loaded.length > 0) setSelectedModel(loaded[0].name);
+    }).catch(() => {});
     fetchSkills()
       .then((loaded) => {
         setSkills(loaded);
@@ -99,7 +105,7 @@ export function FloatingChat() {
   function send() {
     const text = input.trim();
     if (!text) return;
-    const payload = { message: text, uploadedFile: file?.name ?? null, selectedSkills, selectedTools };
+    const payload = { message: text, uploadedFile: file?.name ?? null, selectedModel, selectedSkills, selectedTools };
     console.log('[FloatingChat] send:', payload);
     const uid = `u-${Date.now()}`;
     const bid = `b-${Date.now() + 1}`;
@@ -157,6 +163,25 @@ export function FloatingChat() {
           }
         </div>
         <input ref={fileRef} type="file" accept={ACCEPT} style={{ display: 'none' }} onChange={(e) => handleFile(e.target.files?.[0] ?? null)} />
+
+        {/* Model selector */}
+        {models.length > 0 && (
+          <div className="fc-field">
+            <label className="fc-label" htmlFor="fc-model">Model</label>
+            <select
+              id="fc-model"
+              className="fc-select"
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+            >
+              {models.map((m) => (
+                <option key={m.name} value={m.name}>
+                  {m.display_name ?? m.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Skill dropdown */}
         <div className="fc-field fc-skill-field" ref={skillPanelRef}>
