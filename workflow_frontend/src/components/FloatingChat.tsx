@@ -12,8 +12,19 @@ function extractWorkflowJSON(text: string): string | null {
   try { JSON.parse(m[1]); return m[1]; } catch { return null; }
 }
 
-function workflowToBuilderHref(json: string): string | null {
-  try { return `/?workflow=${btoa(json)}`; } catch { return null; }
+async function saveWorkflowAndGetHref(json: string, hint: string): Promise<string | null> {
+  try {
+    const data = JSON.parse(json);
+    const name = hint.trim().replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60) || 'ai-workflow';
+    const r = await fetch('/api/workflow/projects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, data }),
+    });
+    if (!r.ok) return null;
+    const { name: saved } = (await r.json()) as { name: string };
+    return `/?project=${encodeURIComponent(saved)}`;
+  } catch { return null; }
 }
 
 interface Msg {
@@ -27,7 +38,7 @@ export function FloatingChat({ project = '' }: { project?: string }) {
   const [messages, setMessages]             = useState<Msg[]>([]);
   const [input, setInput]                   = useState('');
   const [streaming, setStreaming]           = useState(false);
-  const [workflowJSON, setWorkflowJSON]     = useState<string | null>(null);
+  const [workflowHref, setWorkflowHref]     = useState<string | null>(null);
 
   const [models, setModels]                 = useState<Model[]>([]);
   const [selectedModel, setSelectedModel]   = useState('');
@@ -129,7 +140,7 @@ export function FloatingChat({ project = '' }: { project?: string }) {
     ]);
     setInput('');
     setStreaming(true);
-    setWorkflowJSON(null);
+    setWorkflowHref(null);
     aiAccumRef.current = '';
 
     try {
@@ -151,7 +162,10 @@ export function FloatingChat({ project = '' }: { project?: string }) {
       );
 
       const wf = extractWorkflowJSON(aiAccumRef.current);
-      if (wf) setWorkflowJSON(wf);
+      if (wf) {
+        const href = await saveWorkflowAndGetHref(wf, text);
+        setWorkflowHref(href);
+      }
     } catch (e) {
       setMessages((prev) =>
         prev.map((m) => m.id === aiId ? { ...m, content: String(e), error: true } : m),
@@ -172,8 +186,6 @@ export function FloatingChat({ project = '' }: { project?: string }) {
   const skillSummary = selectedSkills.length === 0
     ? 'No skills selected'
     : `${selectedSkills.length} skill${selectedSkills.length !== 1 ? 's' : ''} selected`;
-
-  const builderHref = workflowJSON ? workflowToBuilderHref(workflowJSON) : null;
 
   return (
     <div className="fc-window" role="dialog" aria-label="AI Chat Assistant">
@@ -205,10 +217,10 @@ export function FloatingChat({ project = '' }: { project?: string }) {
       </div>
 
       {/* Workflow detected banner */}
-      {builderHref && (
+      {workflowHref && (
         <div className="fc-workflow-banner">
-          <span>⚡ Workflow generated</span>
-          <a href={builderHref} target="_blank" rel="noreferrer" className="fc-workflow-banner__link">
+          <span>⚡ Workflow saved</span>
+          <a href={workflowHref} target="_blank" rel="noreferrer" className="fc-workflow-banner__link">
             Open in Builder ↗
           </a>
         </div>

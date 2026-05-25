@@ -97,6 +97,22 @@ def get_workflow(name: str) -> dict[str, Any]:
     return {"nodes": [], "edges": []}
 
 
+@app.post("/api/workflow/projects")
+def create_workflow(body: dict[str, Any]) -> dict[str, Any]:
+    """Create a new project directory and save an AI-generated workflow."""
+    import json, re, time
+    raw_name: str = body.get("name") or f"ai-workflow-{int(time.time())}"
+    # Sanitize: keep alphanumeric, dash, underscore only
+    name = re.sub(r"[^a-zA-Z0-9_-]", "_", raw_name).strip("_-")[:80] or f"ai-workflow-{int(time.time())}"
+    project_dir = (PROJECTS_DIR / name).resolve()
+    if not project_dir.is_relative_to(PROJECTS_DIR):
+        raise HTTPException(status_code=400, detail="Invalid project name")
+    (project_dir / "src").mkdir(parents=True, exist_ok=True)
+    wf_file = project_dir / WORKFLOW_FILE
+    wf_file.write_text(json.dumps(body.get("data", {}), indent=2, ensure_ascii=False), encoding="utf-8")
+    return {"ok": True, "name": name}
+
+
 @app.put("/api/workflow/projects/{name}")
 def save_workflow(name: str, body: dict[str, Any]) -> dict[str, Any]:
     import json
