@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { APP } from '../workflow.config';
 import { FloatingChat } from '../components/FloatingChat';
 
@@ -20,6 +20,9 @@ const TIPS = [
 ];
 
 export function ChatPage() {
+  const [searchParams] = useSearchParams();
+  const project = searchParams.get('project') ?? '';
+
   return (
     <div className="chat-page">
       <header className="topbar">
@@ -53,7 +56,7 @@ export function ChatPage() {
 
         {/* Right: chat */}
         <div className="chat-page__chat">
-          <FloatingChat />
+          <FloatingChat project={project} />
         </div>
       </div>
     </div>

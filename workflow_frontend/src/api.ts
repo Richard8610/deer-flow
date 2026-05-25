@@ -16,11 +16,12 @@ export async function streamChat(
   project: string,
   onChunk: (text: string) => void,
   onError: (msg: string) => void,
+  options?: { model?: string },
 ): Promise<void> {
   const resp = await fetch('/api/chat/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, project }),
+    body: JSON.stringify({ messages, project, model: options?.model ?? '' }),
   });
   if (!resp.ok) {
     onError(`Server error: HTTP ${resp.status}`);

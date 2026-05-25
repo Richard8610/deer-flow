@@ -169,7 +169,17 @@ async def chat_stream(body: dict[str, Any]) -> StreamingResponse:
     """
     messages: list[dict] = body.get("messages", [])
     project: str = body.get("project", "")
+    model: str = body.get("model", "")
     assistant_id = f"{project}_agent" if project else "project_agent"
+
+    payload: dict[str, Any] = {
+        "assistant_id": assistant_id,
+        "input": {"messages": messages},
+        "stream_mode": ["messages-tuple"],
+        "on_completion": "delete",
+    }
+    if model:
+        payload["config"] = {"configurable": {"model_name": model}}
 
     client = await _gateway()
 
@@ -178,12 +188,7 @@ async def chat_stream(body: dict[str, Any]) -> StreamingResponse:
             async with client.stream(
                 "POST",
                 f"{GW_BASE}/api/runs/stream",
-                json={
-                    "assistant_id": assistant_id,
-                    "input": {"messages": messages},
-                    "stream_mode": ["messages-tuple"],
-                    "on_completion": "delete",
-                },
+                json=payload,
             ) as resp:
                 async for chunk in resp.aiter_bytes():
                     yield chunk
