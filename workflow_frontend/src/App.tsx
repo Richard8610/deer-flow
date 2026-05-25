@@ -21,6 +21,7 @@ export default function App() {
   const saveTimer        = useRef<ReturnType<typeof setTimeout>>();
   const activeProjectRef = useRef('');
   const skipNextSave     = useRef(false);
+  const didAutoSelect    = useRef(false);
 
   // Load from ?workflow=<url> query param
   useEffect(() => {
@@ -31,6 +32,16 @@ export default function App() {
       .then(importJSON)
       .catch((err) => console.error('Failed to load workflow from URL:', err));
   }, [importJSON]);
+
+  // Auto-select project from ?project=<name> URL param once the project list is loaded
+  useEffect(() => {
+    if (didAutoSelect.current || projects.length === 0) return;
+    const param = new URLSearchParams(window.location.search).get('project');
+    if (param && projects.includes(param)) {
+      didAutoSelect.current = true;
+      void handleProjectChange(param);
+    }
+  }, [projects, handleProjectChange]);
 
   // Discover projects from persistence server
   useEffect(() => {

@@ -189,8 +189,18 @@ async def chat_stream(body: dict[str, Any]) -> StreamingResponse:
     messages: list[dict] = body.get("messages", [])
     project: str = body.get("project", "")
     model: str = body.get("model", "")
-    # Map project name to an agent ID, falling back to the system lead agent
-    assistant_id = project if project else "lead_agent"
+
+    # Always use lead_agent for chat — project-specific agents (competitive_analysis_agent,
+    # project_agent) are designed for non-interactive task runs, not streaming chat.
+    # Pass the project name as configurable context so the agent knows which project
+    # the user is working on.
+    assistant_id = "lead_agent"
+
+    config: dict[str, Any] = {}
+    if model:
+        config["model_name"] = model
+    if project:
+        config["project"] = project
 
     payload: dict[str, Any] = {
         "assistant_id": assistant_id,
@@ -198,8 +208,8 @@ async def chat_stream(body: dict[str, Any]) -> StreamingResponse:
         "stream_mode": ["messages-tuple"],
         "on_completion": "delete",
     }
-    if model:
-        payload["config"] = {"configurable": {"model_name": model}}
+    if config:
+        payload["config"] = {"configurable": config}
 
     client = await _gateway()
 
