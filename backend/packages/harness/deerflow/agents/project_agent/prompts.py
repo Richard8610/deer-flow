@@ -21,6 +21,16 @@ Rules:
 - required_tools: choose from bash, read_file, write_file, web_search, web_fetch.
 - priority: 1 = highest, 5 = lowest.
 - Aim for 2–5 focused subtasks.
+
+Workflow / automation tasks — when the user wants to BUILD or IMPLEMENT a workflow, pipeline,
+automation, or agent, always include a dedicated code-generation subtask:
+  {
+    "id": "code",
+    "description": "Generate complete Python project code for the workflow using the workflow-code-generator skill",
+    "required_tools": ["read_file", "write_file", "bash"],
+    "subagent_type": "general-purpose",
+    "priority": 1
+  }
 """
 
 PLAN_PROMPT = """\
@@ -44,6 +54,13 @@ Rules:
 - Each prompt must be self-contained — the subagent has NO context about the broader task or other subtasks.
 - Specify the expected output format in each prompt (e.g., "Write results to /mnt/user-data/workspace/…").
 - Prioritise independent tasks first; dependent tasks should reference expected output paths of their prerequisites.
+
+Code-generation assignments — for any subtask that generates workflow/project code, the prompt MUST:
+1. Start with: "Read /mnt/skills/public/workflow-code-generator/SKILL.md for the full code-generation specification."
+2. State the project name (snake_case) and one-paragraph description of what the workflow does.
+3. List every processing step so the subagent can design the StateGraph nodes.
+4. Specify the output directory: /mnt/user-data/workspace/{project_name}/
+5. End with: "Follow all steps in the skill, produce every file, and verify the quality checklist at the end."
 """
 
 EVALUATE_PROMPT = """\
