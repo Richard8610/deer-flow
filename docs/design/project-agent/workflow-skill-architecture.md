@@ -1,5 +1,10 @@
 # Project Agent Workflow Skill Architecture
 
+> **弃用说明（2026-05）**：本文档描述的是旧方案（workflow skill + custom agent 调用），
+> 已被新方案取代。新主路线为**节点独立 Python 文件 + 业务 Agent + 主 Agent 拆子任务 + subagent 执行**。
+> 请参阅 [`workflow-agent-architecture.md`](workflow-agent-architecture.md)。
+> 本文保留作为历史参考。
+
 ## 背景
 
 此前讨论中，`project_agent` 的目标一度偏向“把工作流固化为 Python/LangGraph 项目代码”，甚至进一步讨论“一节点一 Python 文件”。这个方向仍然有价值，但它不是目标本身。

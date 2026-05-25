@@ -1,40 +1,41 @@
 # Project Agent 一节点一 Python 文件方案设计
 
-> 口径更新：本文记录的是 workflow skill 内部执行产物的一种可选实现策略，不再是 `project_agent` 的主路线。当前推荐主线见 [`workflow-skill-architecture.md`](workflow-skill-architecture.md)：`project_agent` 协助生成和维护 WorkflowSpec，发布为 workflow skill，再由 custom agent 在业务场景中调用。
+> **口径更新（2026-05）**：本方案已确定为主路线。每个工作流节点固化为独立 Python 文件，
+> 由业务 Agent（主 Agent）拆解子任务后派发 subagent 逐节点执行。
+> 详见 [`workflow-agent-architecture.md`](workflow-agent-architecture.md)。
 
 ## 背景
 
-`project_agent` 的目标是把 DeerFlow 从通用 Agent 运行时扩展为面向业务工作流的协同编排系统。此前文档已经明确了目标方向：
+`project_agent` 的目标是把 DeerFlow 从通用 Agent 运行时扩展为面向业务工作流的协同编排系统，仿照 Coze 编程式工作流功能。核心路线已明确：
 
 ```text
-自然语言需求
-  -> WorkflowSpec
-  -> Web 协同编辑
-  -> Python nodes/graph
-  -> 测试与发布
-  -> 确定性执行
+自然语言需求 / Web 画布
+  -> project_agent 生成 WorkflowSpec
+  -> 生成 nodes/*.py + graph.py
+  -> 发布为业务 Agent
+  -> 主 Agent 拆子任务 -> subagent 逐节点执行 -> 评测/重试 -> 整合
 ```
 
-本文专门分析一个关键设计选择：**当 workflow skill 内部需要 Python/LangGraph 固化执行时，是否将每个工作流节点固化为独立 Python 文件，并支持 Agent 和前端对这些节点进行协同调整。**
+本文聚焦一个已确定的设计选择：**将每个工作流节点固化为独立 Python 文件，支持 Agent 协同生成、前端画布编辑、Git 版本管理和独立测试。**
 
-结论：该方案在 DeerFlow 当前技术栈下是可行的，并且符合 Python/LangGraph/Git 项目化的优势；但它不应被视为 workflow 的唯一发布形态。对于多数业务场景，优先发布为 workflow skill；当流程复杂、需要节点级 trace、resume、测试或强类型边界时，再采用 Python/LangGraph codegen。
+结论：该方案在 DeerFlow 当前技术栈（Python + LangGraph）下完全可行，并已作为主路线确定。节点独立文件化有利于 Agent 协同、代码 review、单元测试和增量修改。
 
 ## 目标
 
-一节点一 Python 文件方案希望在 workflow skill 内部实现：
+一节点一 Python 文件方案作为主路线，目标是：
 
 1. 每个业务节点有独立源码文件，便于阅读、测试、审计和局部修改。
 2. 前端画布编辑的是 WorkflowSpec，Agent 可根据用户语言修改 WorkflowSpec。
-3. 后端根据 WorkflowSpec 生成或更新节点 Python 文件和 LangGraph graph。
-4. 已发布 workflow skill 运行时加载 Python graph 或 runner，而不是让 LLM 每次动态规划执行路径。
+3. project_agent 根据 WorkflowSpec 生成或更新节点 Python 文件和 LangGraph graph。
+4. 发布后的业务 Agent 运行时加载 Python graph，主 Agent 拆解子任务、派发 subagent 逐节点执行，而非 LLM 每次动态规划。
 5. 节点尽量接近纯函数：输入来自 `state/config`，输出为 state patch，副作用显式声明。
+6. 支持节点级评测（evaluate）和重试（retry）机制。
 
 ## 非目标
 
 短期内不追求：
 
-- 把“一节点一文件”作为所有 workflow skill 的强制形态。
-- 兼容 Coze Studio 的内部 schema。
+- 兼容 Coze Studio 的内部 Go/Eino 运行时。
 - 直接执行任意前端节点 JSON。
 - 生成任意自由 Python 代码并无审查执行。
 - 第一版支持复杂循环、人工审批、多版本并发运行、分布式调度。

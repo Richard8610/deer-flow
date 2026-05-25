@@ -6,7 +6,7 @@
 
 本 spec 记录一个目标方向：`project_agent` 不应只是运行时动态拆任务的 Agent，而应成为类似 Coze 编程式工作流的人机协同编排助手。用户可以用自然语言生成或调整工作流，也可以在 Web 画布中手动编辑节点和连线；最终工作流应固化为可版本管理、可测试、可审计、可复现的确定流程。
 
-最新推荐路线见 [`workflow-skill-architecture.md`](workflow-skill-architecture.md)。本文中提到的 Python nodes/graph codegen 应理解为一种可选固化方式，而不是唯一目标；更优先的 DeerFlow 集成形态是将已发布业务工作流沉淀为 workflow skill，再由 custom agent 在业务场景中调用。
+最新推荐路线见 [`workflow-agent-architecture.md`](workflow-agent-architecture.md)。工作流节点固化为独立 Python 文件，由业务 Agent（主 Agent）拆解子任务后派发 subagent 执行，配合评测与重试机制。
 
 ## 目标愿景
 

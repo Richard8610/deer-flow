@@ -24,9 +24,9 @@ Coze 的公开工作流体系与 `project_agent` 目标在 **产品方向** 上�
 差异点：
 
 - Coze 开源版是 **画布 spec + Go/Eino 中心化运行时**。
-- DeerFlow `project_agent` 目标更适合走 **workflow spec + workflow skill + custom agent 调用**。Python/LangGraph 项目代码可作为复杂 workflow 的内部执行实现，但不是唯一发布形态。
+- DeerFlow `project_agent` 目标已确定为 **workflow spec → 节点 Python 文件 → 发布业务 Agent → 主 Agent 拆子任务 + subagent 执行**。
 
-因此，Coze 可以作为 **架构参考和交互参考**，但不能直接作为 `project_agent` 的代码生成和执行方案。新的主线详见 [`workflow-skill-architecture.md`](workflow-skill-architecture.md)。
+因此，Coze 可以作为 **架构参考和交互参考**，但不能直接作为 `project_agent` 的代码生成和执行方案。新的主线详见 [`workflow-agent-architecture.md`](workflow-agent-architecture.md)。
 
 ## 需求匹配矩阵
 
@@ -35,10 +35,10 @@ Coze 的公开工作流体系与 `project_agent` 目标在 **产品方向** 上�
 | 可视化工作流编辑 | 高 | 原型已具备 | 可重点参考 FlowGram / Coze Studio |
 | 节点类型体系 | 高 | 较弱 | 应借鉴 Coze 节点 schema 与前后端双注册 |
 | 工作流 spec | 高 | 目前只是 React Flow JSON | 需要升级为业务语义 spec |
-| spec 到确定性执行 | 高，但基于 Go/Eino | Python graph 已可执行，skills/custom agent 体系更成熟 | 可借鉴分层，发布为 workflow skill，内部可用 LangGraph |
+| spec 到确定性执行 | 高，但基于 Go/Eino | Python graph 已可执行，节点文件 + subagent 体系已定 | 可借鉴分层，发布为业务 Agent（节点 Python 文件化），内部用 LangGraph |
 | 自然语言生成整图 | 低 | 未实现 | 需要 DeerFlow 自研 |
 | 人机协同修改 workflow | 中低 | 未实现 | 可借鉴 Coze Copilot 局部辅助理念，自研 patch 流程 |
-| 前端编辑同步后端执行 | 高，平台内闭环 | 未打通 | 需要 `workflow spec -> workflow skill -> runner/graph` |
+| 前端编辑同步后端执行 | 高，平台内闭环 | 未打通 | 需要 `workflow spec -> nodes/*.py -> 业务 Agent 发布` |
 | 生成 Python nodes/graph | 无 | 手写项目图存在 | 可选高级实现 |
 | 业务工作流能力复用 | 中，平台内 workflow/tool | skills/custom agent 体系已具备 | DeerFlow 差异化方向 |
 | 节点级调试/观测 | 高 | 较弱 | 可借鉴 debug_url、trace、coze-loop |
@@ -97,9 +97,9 @@ Coze 工作流则更像：
 ```text
 用户自然语言 + Web 编辑
   -> workflow spec
-  -> 发布 workflow skill
-  -> custom agent 按场景调用
-  -> 确定执行并产出交付物
+  -> 生成 nodes/*.py + graph.py
+  -> 发布为业务 Agent
+  -> 主 Agent 拆子任务 → subagent 执行 → 评测/重试 → 整合
 ```
 
 所以当前 `project_agent` 还只是目标形态的前半部分，尚未形成 Coze 式工作流平台的闭环。
@@ -139,7 +139,7 @@ UI Layout
   -> LangGraph Runtime
 ```
 
-### 2. 缺少 Spec 到 workflow skill 的发布链路
+### 2. 缺少 Spec 到业务 Agent 的发布链路
 
 这是与用户目标差距最大的地方。
 
@@ -153,12 +153,12 @@ projects/competitive_analysis/src/graphs/competitive_analysis.py
 
 ```text
 workflow.json
-  -> workflow skill
-  -> runner / graph
-  -> custom agent 调用
+  -> 生成 nodes/*.py + graph.py
+  -> 注册为业务 Agent
+  -> 主 Agent 拆子任务 → subagent 执行
 ```
 
-Coze 开源体系也没有这个能力。Coze 选择的是 schema 由平台解释执行；DeerFlow 如果要强调确定性、可维护、可复用，更适合把工作流发布为 skill，内部再按复杂度选择脚本、runner 或 Python/LangGraph graph。
+Coze 开源体系也没有这个能力。Coze 选择的是 schema 由平台解释执行；DeerFlow 已确定节点 Python 文件化，project_agent 负责生成代码并发布为业务 Agent。
 
 ### 3. 缺少 Agent 对已有工作流的结构化 patch
 
@@ -334,7 +334,7 @@ skills/custom/{workflow_name}/SKILL.md
 skills/custom/{workflow_name}/scripts/run.py
 ```
 
-DeerFlow 的目标如果是业务确定性和可维护，应该生成可 review、可测试、可被 custom agent 选择调用的 workflow skill，而不是仅存沙箱片段。复杂场景仍可在 skill 内部生成 Python 文件或 LangGraph graph。
+DeerFlow 的目标如果是业务确定性和可维护，应生成可 review、可测试、节点独立 Python 文件化的业务 Agent，而不是仅存沙箱片段。主 Agent 拆解子任务后由 subagent 逐节点执行，配合评测与重试机制。
 
 ### 3. 不建议依赖 Coze SDK 做图编辑
 
@@ -427,9 +427,9 @@ projects/{project_name}/
 ### 运行策略建议
 
 ```text
-开发态：允许根据 workflow.draft.json 生成预览 runner 或 graph
-测试态：运行 workflow skill 的 smoke test
-发布态：custom agent 只调用已发布 workflow skill
+开发态：允许根据 workflow.draft.json 生成预览 nodes/*.py 和 graph.py
+测试态：运行业务 Agent 的 smoke test
+发布态：用户通过业务 Agent（主 Agent 拆子任务 + subagent 执行）调用已发布工作流
 ```
 
 ## 路线优先级
@@ -455,18 +455,18 @@ projects/{project_name}/
 - 前端 chat 带上当前 spec。
 - Agent 返回 JSON patch 或完整 spec。
 
-### P2：Spec 到 workflow skill 发布
+### P2：Spec 到业务 Agent 发布
 
 这是和 Coze 开源最大的差异化。
 
 交付：
 
-- `SKILL.md` 模板。
-- `workflow.published.json`。
-- `manifest.json`。
-- `scripts/run.py` 或 graph 引用。
+- `nodes/*.py` 代码生成器。
+- `graphs/workflow_graph.py` 编译器。
+- 业务 Agent 注册（`agents/{name}/config.yaml`）。
 - 发布 diff 展示。
 - smoke test。
+- 节点级评测和重试机制。
 
 ### P3：运行和调试
 
@@ -514,10 +514,10 @@ Python codegen：开源侧不覆盖，可作为 DeerFlow 高级实现
 workflow skill 发布：DeerFlow 应自研并作为差异化
 ```
 
-因此，后续建设应避免把目标理解成“复刻 Coze Studio”，而应是：
+因此，后续建设应避免把目标理解成"复刻 Coze Studio"，而应是：
 
 ```text
 借鉴 Coze 的工作流产品架构
 保留 DeerFlow 的 skills/custom agent/Gateway/Client 结构
-补齐 workflow spec -> workflow skill -> custom agent -> deterministic delivery 闭环
+补齐 workflow spec -> nodes/*.py -> 业务 Agent 发布 -> 主 Agent 拆子任务 + subagent 执行 -> 确定性交付 闭环
 ```
