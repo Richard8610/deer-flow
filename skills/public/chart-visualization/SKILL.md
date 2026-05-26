@@ -55,7 +55,7 @@ Invoke the `scripts/generate.js` script with a JSON payload.
 
 **Execution Command:**
 ```bash
-node ./scripts/generate.js '<payload_json>'
+node ./src/generate.js '<payload_json>'
 ```
 
 ### 4. Result Return

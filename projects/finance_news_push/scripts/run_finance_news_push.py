@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """CLI runner — run from repo root:
-    uv run python projects/finance_news_push/scripts/run_finance_news_push.py [args]
+    uv run python projects/finance_news_push/src/run_finance_news_push.py [args]
 """
 from __future__ import annotations
 import asyncio

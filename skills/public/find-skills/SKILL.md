@@ -88,13 +88,13 @@ Learn more: https://skills.sh/vercel-labs/agent-skills/vercel-react-best-practic
 If the user wants to proceed, use the `install-skill.sh` script to install the skill and automatically link it to the project:
 
 ```bash
-bash /path/to/skill/scripts/install-skill.sh <owner/repo@skill-name>
+bash /path/to/skill/src/install-skill.sh <owner/repo@skill-name>
 ```
 
 For example, if the user wants to install `vercel-react-best-practices`:
 
 ```bash
-bash /path/to/skill/scripts/install-skill.sh vercel-labs/agent-skills@vercel-react-best-practices
+bash /path/to/skill/src/install-skill.sh vercel-labs/agent-skills@vercel-react-best-practices
 ```
 
 The script will install the skill globally to `skills/custom/`

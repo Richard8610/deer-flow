@@ -3,64 +3,144 @@
     {
       "id": "start",
       "type": "io",
-      "position": { "x": 40, "y": 200 },
+      "position": {
+        "x": -27.5191535557544,
+        "y": 281.98754360341604
+      },
       "data": {
         "nodeKind": "start",
         "label": "Daily Trigger",
         "description": "Schedule trigger at 8 AM daily"
-      }
+      },
+      "measured": {
+        "width": 220,
+        "height": 82
+      },
+      "selected": false,
+      "dragging": false
     },
     {
       "id": "fetch_news",
       "type": "process",
-      "position": { "x": 280, "y": 200 },
+      "position": {
+        "x": 232.73659251097195,
+        "y": 204.8227966825539
+      },
       "data": {
         "nodeKind": "tool",
         "label": "Fetch News",
         "description": "Fetch A-Share news from RSS feeds",
         "toolName": "get_stock_news",
-        "outputFields": ["raw_news[]"]
-      }
+        "outputFields": [
+          "raw_news[]"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 105
+      },
+      "selected": false,
+      "dragging": false
     },
     {
       "id": "process_content",
       "type": "process",
-      "position": { "x": 520, "y": 200 },
+      "position": {
+        "x": 493.9568979142091,
+        "y": 231.83045810485564
+      },
       "data": {
         "nodeKind": "tool",
         "label": "Format Content",
         "description": "Extract and format 10 key news items",
-        "inputFields": ["raw_news[]"],
-        "outputFields": ["formatted_content"]
-      }
+        "inputFields": [
+          "raw_news[]"
+        ],
+        "outputFields": [
+          "formatted_content"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 122
+      },
+      "selected": false,
+      "dragging": false
     },
     {
       "id": "save_and_notify",
       "type": "process",
-      "position": { "x": 760, "y": 200 },
+      "position": {
+        "x": 734.9214572507198,
+        "y": 124.76437175215938
+      },
       "data": {
         "nodeKind": "tool",
         "label": "Save & Notify",
         "description": "Save output and send notification",
-        "inputFields": ["formatted_content"],
-        "outputFields": ["final_output", "saved_path"]
-      }
+        "inputFields": [
+          "formatted_content"
+        ],
+        "outputFields": [
+          "final_output",
+          "saved_path"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 122
+      },
+      "selected": false,
+      "dragging": false
     },
     {
       "id": "end",
       "type": "io",
-      "position": { "x": 1000, "y": 200 },
+      "position": {
+        "x": 1002.8936780095323,
+        "y": 199.03544066348923
+      },
       "data": {
         "nodeKind": "end",
         "label": "Done",
         "description": "News delivered"
-      }
+      },
+      "measured": {
+        "width": 220,
+        "height": 84
+      },
+      "selected": false,
+      "dragging": false
     }
   ],
   "edges": [
-    { "id": "e1", "source": "start", "target": "fetch_news", "type": "dataflow", "animated": true },
-    { "id": "e2", "source": "fetch_news", "target": "process_content", "type": "dataflow", "animated": true },
-    { "id": "e3", "source": "process_content", "target": "save_and_notify", "type": "dataflow", "animated": true },
-    { "id": "e4", "source": "save_and_notify", "target": "end", "type": "dataflow", "animated": true }
+    {
+      "id": "e1",
+      "source": "start",
+      "target": "fetch_news",
+      "type": "dataflow",
+      "animated": true
+    },
+    {
+      "id": "e2",
+      "source": "fetch_news",
+      "target": "process_content",
+      "type": "dataflow",
+      "animated": true
+    },
+    {
+      "id": "e3",
+      "source": "process_content",
+      "target": "save_and_notify",
+      "type": "dataflow",
+      "animated": true
+    },
+    {
+      "id": "e4",
+      "source": "save_and_notify",
+      "target": "end",
+      "type": "dataflow",
+      "animated": true
+    }
   ]
 }

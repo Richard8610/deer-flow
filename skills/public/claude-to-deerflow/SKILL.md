@@ -186,7 +186,7 @@ curl -s -X POST "$DEERFLOW_LANGGRAPH_URL/threads/search" \
 For sending messages and collecting the full response, use the helper script:
 
 ```bash
-bash /path/to/skills/claude-to-deerflow/scripts/chat.sh "Your question here"
+bash /path/to/skills/claude-to-deerflow/src/chat.sh "Your question here"
 ```
 
 See `scripts/chat.sh` for the implementation. The script:

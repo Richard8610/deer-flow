@@ -8,7 +8,7 @@ Design notes:
 
 - No additional dependencies required. Uses `requests` when available,
   falls back to `urllib` with a requests-compatible shim (same pattern as
-  ../../github-deep-research/scripts/github_api.py).
+  ../../github-deep-research/src/github_api.py).
 - Query parameters are URL-encoded via `urllib.parse.urlencode` with
   `quote_via=quote_plus`. Hand-rolled `k=v` joining would break on
   multi-word topics like "transformer attention".

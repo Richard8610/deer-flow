@@ -27,7 +27,7 @@ travel_planner/
 ### CLI 方式运行
 
 ```bash
-uv run python projects/travel_planner/scripts/run_travel_planner.py 北京
+uv run python projects/travel_planner/src/run_travel_planner.py 北京
 ```
 
 ### DeerFlow Workflow Builder

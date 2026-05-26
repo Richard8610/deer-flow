@@ -61,7 +61,7 @@ transparently, adding `X-User-Id` for traceability.
 ### 1. Start Minikube and enable addons
 
 ```bash
-bash scripts/setup.sh
+bash src/setup.sh
 ```
 
 This starts Minikube with 4 CPUs / 6 GB RAM and enables the Nginx Ingress and
@@ -89,7 +89,7 @@ Images are built **inside Minikube's Docker daemon** so they are available to
 Kubernetes without a registry.
 
 ```bash
-bash scripts/build.sh
+bash src/build.sh
 ```
 
 This builds:
@@ -99,7 +99,7 @@ This builds:
 ### 5. Deploy to Kubernetes
 
 ```bash
-bash scripts/deploy.sh
+bash src/deploy.sh
 ```
 
 Watch the Hub pod come up:

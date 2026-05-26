@@ -195,7 +195,7 @@ CLI runner pattern from `competitive_analysis`:
 ```python
 #!/usr/bin/env python3
 """CLI runner — run from repo root:
-    uv run python projects/{project_name}/scripts/run_{project_name}.py [args]
+    uv run python projects/{project_name}/src/run_{project_name}.py [args]
 """
 from __future__ import annotations
 import asyncio, sys

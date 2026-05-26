@@ -36,7 +36,7 @@ Start → Fetch News → Format Content → Save & Notify → End
 
 ### 手动运行
 ```bash
-uv run python projects/finance_news_push/scripts/run_finance_news_push.py
+uv run python projects/finance_news_push/src/run_finance_news_push.py
 ```
 
 ### 定时运行

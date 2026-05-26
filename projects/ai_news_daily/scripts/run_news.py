@@ -6,19 +6,19 @@ Usage
 From the repository root::
 
     # Write digest to a local file (default)
-    uv run python projects/ai_news_daily/scripts/run_news.py --method file
+    uv run python projects/ai_news_daily/src/run_news.py --method file
 
     # Send via Telegram (credentials from env or config.json)
-    uv run python projects/ai_news_daily/scripts/run_news.py --method telegram
+    uv run python projects/ai_news_daily/src/run_news.py --method telegram
 
     # POST to a webhook
-    uv run python projects/ai_news_daily/scripts/run_news.py --method webhook
+    uv run python projects/ai_news_daily/src/run_news.py --method webhook
 
     # Fetch top 5 stories instead of 3
-    uv run python projects/ai_news_daily/scripts/run_news.py --top-n 5
+    uv run python projects/ai_news_daily/src/run_news.py --top-n 5
 
     # Load credentials from a JSON file
-    uv run python projects/ai_news_daily/scripts/run_news.py \\
+    uv run python projects/ai_news_daily/src/run_news.py \\
         --method telegram --config path/to/config.json
 
 Requirements

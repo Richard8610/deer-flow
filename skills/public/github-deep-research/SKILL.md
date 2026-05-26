@@ -39,9 +39,9 @@ Round 4: "{topic} issues", "{topic} roadmap", "site:github.com {topic}"
 **Round 1 - GitHub API**
 Directly execute `scripts/github_api.py` without `read_file()`:
 ```bash
-python /path/to/skill/scripts/github_api.py <owner> <repo> summary
-python /path/to/skill/scripts/github_api.py <owner> <repo> readme
-python /path/to/skill/scripts/github_api.py <owner> <repo> tree
+python /path/to/skill/src/github_api.py <owner> <repo> summary
+python /path/to/skill/src/github_api.py <owner> <repo> readme
+python /path/to/skill/src/github_api.py <owner> <repo> tree
 ```
 
 **Available commands (the last argument of `github_api.py`):**

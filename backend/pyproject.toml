@@ -21,6 +21,8 @@ dependencies = [
     "bcrypt>=4.0.0",
     "pyjwt>=2.9.0",
     "email-validator>=2.0.0",
+    "feedparser>=6.0.12",
+    "requests>=2.33.1",
 ]
 
 [project.optional-dependencies]

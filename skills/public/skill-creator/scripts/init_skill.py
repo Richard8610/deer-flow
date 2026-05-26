@@ -60,20 +60,20 @@ Delete this entire "Structuring This Skill" section when done - it's just guidan
 - Code samples for technical skills
 - Decision trees for complex workflows
 - Concrete examples with realistic user requests
-- References to scripts/templates/references as needed]
+- References to src/templates/references as needed]
 
 ## Resources
 
 This skill includes example resource directories that demonstrate how to organize different types of bundled resources:
 
-### scripts/
+### src/
 Executable code (Python/Bash/etc.) that can be run directly to perform specific operations.
 
 **Examples from other skills:**
 - PDF skill: `fill_fillable_fields.py`, `extract_form_field_info.py` - utilities for PDF manipulation
 - DOCX skill: `document.py`, `utilities.py` - Python modules for document processing
 
-**Appropriate for:** Python scripts, shell scripts, or any executable code that performs automation, data processing, or specific operations.
+**Appropriate for:** Python src, shell src, or any executable code that performs automation, data processing, or specific operations.
 
 **Note:** Scripts may be executed without loading into context, but can still be read by Claude for patching or environment adjustments.
 
@@ -109,9 +109,9 @@ Example helper script for {skill_name}
 This is a placeholder script that can be executed directly.
 Replace with actual implementation or delete if not needed.
 
-Example real scripts from other skills:
-- pdf/scripts/fill_fillable_fields.py - Fills PDF form fields
-- pdf/scripts/convert_pdf_to_images.py - Converts PDF pages to images
+Example real src from other skills:
+- pdf/src/fill_fillable_fields.py - Fills PDF form fields
+- pdf/src/convert_pdf_to_images.py - Converts PDF pages to images
 """
 
 def main():
@@ -235,13 +235,13 @@ def init_skill(skill_name, path):
 
     # Create resource directories with example files
     try:
-        # Create scripts/ directory with example script
-        scripts_dir = skill_dir / 'scripts'
+        # Create src/ directory with example script
+        scripts_dir = skill_dir / 'src'
         scripts_dir.mkdir(exist_ok=True)
         example_script = scripts_dir / 'example.py'
         example_script.write_text(EXAMPLE_SCRIPT.format(skill_name=skill_name))
         example_script.chmod(0o755)
-        print("✅ Created scripts/example.py")
+        print("✅ Created src/example.py")
 
         # Create references/ directory with example reference doc
         references_dir = skill_dir / 'references'
@@ -264,7 +264,7 @@ def init_skill(skill_name, path):
     print(f"\n✅ Skill '{skill_name}' initialized successfully at {skill_dir}")
     print("\nNext steps:")
     print("1. Edit SKILL.md to complete the TODO items and update the description")
-    print("2. Customize or delete the example files in scripts/, references/, and assets/")
+    print("2. Customize or delete the example files in src/, references/, and assets/")
     print("3. Run the validator when ready to check the skill structure")
 
     return skill_dir

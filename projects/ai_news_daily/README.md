@@ -74,23 +74,23 @@ ai_news_daily/
 
 ```bash
 # Write digest to a local Markdown file (default, no credentials needed)
-uv run python projects/ai_news_daily/scripts/run_news.py --method file
+uv run python projects/ai_news_daily/src/run_news.py --method file
 
 # Fetch top 5 stories instead of 3
-uv run python projects/ai_news_daily/scripts/run_news.py --top-n 5
+uv run python projects/ai_news_daily/src/run_news.py --top-n 5
 
 # Send via Telegram (credentials from env vars)
 export TELEGRAM_BOT_TOKEN=your_bot_token
 export TELEGRAM_CHAT_ID=your_chat_id
-uv run python projects/ai_news_daily/scripts/run_news.py --method telegram
+uv run python projects/ai_news_daily/src/run_news.py --method telegram
 
 # Send via Telegram using a credentials JSON file
-uv run python projects/ai_news_daily/scripts/run_news.py \
+uv run python projects/ai_news_daily/src/run_news.py \
     --method telegram --config path/to/credentials.json
 
 # POST to a webhook
 export WEBHOOK_URL=https://your.endpoint/hook
-uv run python projects/ai_news_daily/scripts/run_news.py --method webhook
+uv run python projects/ai_news_daily/src/run_news.py --method webhook
 ```
 
 Example `credentials.json`:

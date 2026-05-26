@@ -23,7 +23,7 @@ docker build \
 Or use the provided convenience script from the repo root:
 
 ```bash
-bash multi-user-k8s-local/scripts/build.sh
+bash multi-user-k8s-local/src/build.sh
 ```
 
 ## What the image does

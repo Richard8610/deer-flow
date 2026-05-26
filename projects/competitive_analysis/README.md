@@ -76,8 +76,8 @@ Content-Type: application/json
 
 ```bash
 # From the repository root
-uv run python projects/competitive_analysis/scripts/run_analysis.py "OpenAI"
-uv run python projects/competitive_analysis/scripts/run_analysis.py "字节跳动"
+uv run python projects/competitive_analysis/src/run_analysis.py "OpenAI"
+uv run python projects/competitive_analysis/src/run_analysis.py "字节跳动"
 ```
 
 ### Via DeerFlow Chat (Skill)

@@ -1,0 +1,306 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "type": "io",
+      "position": {
+        "x": -85.20899233897343,
+        "y": 188.9747629602544
+      },
+      "data": {
+        "label": "User Input",
+        "nodeKind": "start",
+        "description": "Company name from user message",
+        "outputFields": [
+          "messages"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 104
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "extract_company",
+      "type": "process",
+      "position": {
+        "x": 259.09762946622385,
+        "y": 381.03493638539214
+      },
+      "data": {
+        "label": "Extract Company",
+        "nodeKind": "tool",
+        "toolName": "company_extractor",
+        "description": "Parse company name from message text",
+        "inputFields": [
+          "messages"
+        ],
+        "outputFields": [
+          "task_description"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 138
+      },
+      "selected": false,
+      "dragging": false
+    },
+    {
+      "id": "company_research",
+      "type": "process",
+      "position": {
+        "x": 520,
+        "y": 60
+      },
+      "data": {
+        "label": "Company Research",
+        "nodeKind": "subagent",
+        "subagentType": "ca-researcher",
+        "timeoutSeconds": 300,
+        "description": "Profile, products, funding & recent news",
+        "inputFields": [
+          "task_description"
+        ],
+        "outputFields": [
+          "execution_results[company]"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 138
+      }
+    },
+    {
+      "id": "competitor_research",
+      "type": "process",
+      "position": {
+        "x": 520,
+        "y": 220
+      },
+      "data": {
+        "label": "Competitor Research",
+        "nodeKind": "subagent",
+        "subagentType": "ca-researcher",
+        "timeoutSeconds": 300,
+        "description": "Top 3–5 competitors with comparison table",
+        "inputFields": [
+          "task_description"
+        ],
+        "outputFields": [
+          "execution_results[competitors]"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 152
+      }
+    },
+    {
+      "id": "market_research",
+      "type": "process",
+      "position": {
+        "x": 520,
+        "y": 380
+      },
+      "data": {
+        "label": "Market Research",
+        "nodeKind": "subagent",
+        "subagentType": "ca-researcher",
+        "timeoutSeconds": 300,
+        "description": "Market size, trends, growth drivers & risks",
+        "inputFields": [
+          "task_description"
+        ],
+        "outputFields": [
+          "execution_results[market]"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 138
+      }
+    },
+    {
+      "id": "generate_report",
+      "type": "process",
+      "position": {
+        "x": 820,
+        "y": 220
+      },
+      "data": {
+        "label": "Generate Report",
+        "nodeKind": "llm",
+        "model": "default",
+        "description": "Synthesise research into Markdown report",
+        "prompt": "COMPETITIVE_REPORT_PROMPT_TEMPLATE",
+        "inputFields": [
+          "task_description",
+          "execution_results"
+        ],
+        "outputFields": [
+          "final_output"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 155
+      }
+    },
+    {
+      "id": "save_report",
+      "type": "process",
+      "position": {
+        "x": 1080,
+        "y": 220
+      },
+      "data": {
+        "label": "Save Report",
+        "nodeKind": "tool",
+        "toolName": "write_file",
+        "description": "Write to disk and append file path to output",
+        "inputFields": [
+          "final_output",
+          "task_description"
+        ],
+        "outputFields": [
+          "final_output"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 155
+      }
+    },
+    {
+      "id": "end",
+      "type": "io",
+      "position": {
+        "x": 1330,
+        "y": 220
+      },
+      "data": {
+        "label": "Report Output",
+        "nodeKind": "end",
+        "description": "Competitive analysis Markdown report",
+        "inputFields": [
+          "final_output"
+        ]
+      },
+      "measured": {
+        "width": 220,
+        "height": 121
+      }
+    },
+    {
+      "id": "node_201",
+      "type": "process",
+      "position": {
+        "x": 132.07325134905486,
+        "y": 703.2871251663735
+      },
+      "data": {
+        "label": "New LLM",
+        "nodeKind": "llm",
+        "description": "",
+        "inputFields": [],
+        "outputFields": []
+      },
+      "measured": {
+        "width": 220,
+        "height": 64
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-start-extract",
+      "source": "start",
+      "target": "extract_company",
+      "type": "dataflow",
+      "animated": true,
+      "label": "messages",
+      "selected": false
+    },
+    {
+      "id": "e-extract-company",
+      "source": "extract_company",
+      "target": "company_research",
+      "type": "dataflow",
+      "animated": true,
+      "label": "task_description"
+    },
+    {
+      "id": "e-extract-competitor",
+      "source": "extract_company",
+      "target": "competitor_research",
+      "type": "dataflow",
+      "animated": true,
+      "label": "task_description"
+    },
+    {
+      "id": "e-extract-market",
+      "source": "extract_company",
+      "target": "market_research",
+      "type": "dataflow",
+      "animated": true,
+      "label": "task_description"
+    },
+    {
+      "id": "e-company-report",
+      "source": "company_research",
+      "target": "generate_report",
+      "type": "dataflow",
+      "animated": true,
+      "label": "execution_results"
+    },
+    {
+      "id": "e-competitor-report",
+      "source": "competitor_research",
+      "target": "generate_report",
+      "type": "dataflow",
+      "animated": true,
+      "label": "execution_results"
+    },
+    {
+      "id": "e-market-report",
+      "source": "market_research",
+      "target": "generate_report",
+      "type": "dataflow",
+      "animated": true,
+      "label": "execution_results"
+    },
+    {
+      "id": "e-report-save",
+      "source": "generate_report",
+      "target": "save_report",
+      "type": "dataflow",
+      "animated": true,
+      "label": "final_output"
+    },
+    {
+      "id": "e-save-end",
+      "source": "save_report",
+      "target": "end",
+      "type": "dataflow",
+      "animated": true,
+      "label": "final_output"
+    },
+    {
+      "type": "dataflow",
+      "animated": true,
+      "source": "start",
+      "target": "node_201",
+      "id": "xy-edge__start-node_201"
+    },
+    {
+      "type": "dataflow",
+      "animated": true,
+      "source": "node_201",
+      "target": "extract_company",
+      "id": "xy-edge__node_201-extract_company"
+    }
+  ]
+}

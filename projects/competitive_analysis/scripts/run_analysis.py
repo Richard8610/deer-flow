@@ -5,8 +5,8 @@ Usage
 -----
 From the repository root::
 
-    uv run python projects/competitive_analysis/scripts/run_analysis.py "OpenAI"
-    uv run python projects/competitive_analysis/scripts/run_analysis.py "字节跳动"
+    uv run python projects/competitive_analysis/src/run_analysis.py "OpenAI"
+    uv run python projects/competitive_analysis/src/run_analysis.py "字节跳动"
 
 The script compiles the graph, runs the full pipeline, and prints the
 Markdown report. The report is also saved to disk by ``save_report_node``.

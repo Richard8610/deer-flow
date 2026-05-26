@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """CLI runner — run from repo root:
-    uv run python projects/travel_planner/scripts/run_travel_planner.py [城市名称]
+    uv run python projects/travel_planner/src/run_travel_planner.py [城市名称]
 """
 from __future__ import annotations
 import asyncio, sys
