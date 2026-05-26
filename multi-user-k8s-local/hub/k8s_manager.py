@@ -175,10 +175,16 @@ def _ensure_pod(core_v1: client.CoreV1Api, user_id: str) -> None:
                     ],
                     env=[
                         client.V1EnvVar(name="DEERFLOW_USER_ID", value=user_id),
-                        client.V1EnvVar(
-                            name="DEER_FLOW_CONFIG_PATH",
-                            value="/app/config.yaml",
-                        ),
+                        client.V1EnvVar(name="DEER_FLOW_CONFIG_PATH", value="/app/config.yaml"),
+                        client.V1EnvVar(name="DEER_FLOW_HOME", value="/app/.deer-flow"),
+                    ],
+                    env_from=[
+                        client.V1EnvFromSource(
+                            secret_ref=client.V1SecretEnvSource(
+                                name="deerflow-api-keys",
+                                optional=True,
+                            )
+                        )
                     ],
                     resources=client.V1ResourceRequirements(
                         requests={"cpu": "250m", "memory": "512Mi"},

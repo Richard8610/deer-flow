@@ -1,180 +1,504 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cloud Workspace Hub</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeerFlow Cloud Workspace</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .msg-user   { background: #4f46e5; margin-left: auto; border-radius: 18px 18px 4px 18px; }
+    .msg-ai     { background: #1e293b; margin-right: auto; border-radius: 18px 18px 18px 4px; }
+    .msg-system { background: #0f172a; margin: 0 auto; border-radius: 8px; font-size: 0.78rem; color: #64748b; text-align: center; }
+    #messages   { scroll-behavior: smooth; }
+    .typing-dot { animation: blink 1.2s infinite; }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes blink { 0%,80%,100%{opacity:.2} 40%{opacity:1} }
+    .step-done  { color: #22c55e; }
+    .step-active{ color: #a78bfa; animation: pulse 1.5s ease-in-out infinite; }
+    .step-wait  { color: #334155; }
+    @keyframes pulse { 0%,100%{opacity:.6} 50%{opacity:1} }
+    pre { white-space: pre-wrap; word-break: break-word; }
+    code { font-family: 'Fira Code', 'Courier New', monospace; font-size: 0.85em; }
+    .code-block { background: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 12px; margin: 6px 0; overflow-x: auto; }
+  </style>
 </head>
-<body class="bg-gray-900 text-white font-sans min-h-screen flex items-center justify-center">
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col overflow-hidden">
 
-    <div id="auth-card" class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
-        <h2 id="auth-title" class="text-3xl font-bold mb-6 text-center text-indigo-400">Login to Workspace</h2>
-
-        <form id="auth-form" class="space-y-4">
-            <div>
-                <label class="block text-sm font-medium text-gray-400">Username</label>
-                <input type="text" id="username" required class="w-full mt-1 p-3 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-indigo-500">
-            </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-400">Password</label>
-                <input type="password" id="password" required class="w-full mt-1 p-3 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-indigo-500">
-            </div>
-            <button type="submit" id="submit-btn" class="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-700 rounded font-semibold transition duration-200">
-                Sign In
-            </button>
-        </form>
-
-        <p class="mt-6 text-sm text-center text-gray-400">
-            <span id="toggle-text">Don't have an account?</span>
-            <button id="toggle-auth-mode" class="text-indigo-400 hover:underline ml-1 focus:outline-none">Sign Up</button>
-        </p>
+<!-- ═══════════════ AUTH SCREEN ═══════════════ -->
+<div id="screen-auth" class="flex-1 flex items-center justify-center p-4">
+  <div class="w-full max-w-sm">
+    <div class="text-center mb-8">
+      <div class="text-5xl mb-3">🦌</div>
+      <h1 class="text-3xl font-bold text-white">DeerFlow</h1>
+      <p class="text-slate-400 mt-1">Your personal AI workspace</p>
     </div>
 
-    <div id="dashboard-card" class="hidden bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-2xl text-center">
-        <h2 class="text-3xl font-bold mb-2">Welcome, <span id="user-display" class="text-indigo-400">User</span>!</h2>
-        <p class="text-gray-400 mb-6">Initializing your isolated Kubernetes cloud environment...</p>
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+      <div class="flex rounded-xl bg-slate-800 p-1 mb-6">
+        <button id="tab-login" onclick="setAuthMode('login')"
+          class="flex-1 py-2 rounded-lg text-sm font-medium transition-all bg-slate-700 text-white shadow">
+          Sign In
+        </button>
+        <button id="tab-register" onclick="setAuthMode('register')"
+          class="flex-1 py-2 rounded-lg text-sm font-medium transition-all text-slate-400">
+          Register
+        </button>
+      </div>
 
-        <div id="env-loading" class="space-y-4">
-            <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-indigo-500 mx-auto"></div>
-            <p class="text-sm text-yellow-400 animate-pulse">Mounting your personal filesystem storage (PVC)...</p>
+      <form id="auth-form" onsubmit="submitAuth(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5">Username</label>
+          <input id="inp-username" type="text" required autocomplete="username"
+            class="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500
+                   focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+            placeholder="your_username">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-400 mb-1.5">Password</label>
+          <input id="inp-password" type="password" required autocomplete="current-password"
+            class="w-full px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500
+                   focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition"
+            placeholder="••••••••">
         </div>
 
-        <div id="env-ready" class="hidden space-y-4">
-            <div class="bg-green-900/30 border border-green-500 p-4 rounded text-green-400">
-                ✓ Environment successfully provisioned in Minikube!
-            </div>
-            <button id="launch-btn" class="w-full py-4 bg-green-600 hover:bg-green-700 rounded-lg text-lg font-bold shadow-lg transform hover:scale-[1.01] transition duration-200">
-                Open My Workspace
-            </button>
-        </div>
+        <div id="auth-error" class="hidden text-red-400 text-sm bg-red-900/20 border border-red-800/40 rounded-lg px-3 py-2"></div>
 
-        <button id="logout-btn" class="mt-8 text-sm text-gray-500 hover:text-gray-300 underline">Log Out</button>
+        <button type="submit" id="auth-submit"
+          class="w-full py-2.5 mt-1 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-semibold text-white transition-colors">
+          Sign In
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ LOADING SCREEN ═══════════════ -->
+<div id="screen-loading" class="hidden flex-1 flex items-center justify-center p-4">
+  <div class="w-full max-w-md text-center">
+    <div class="text-5xl mb-6">🦌</div>
+    <h2 class="text-2xl font-bold text-white mb-1">Provisioning workspace</h2>
+    <p id="loading-user" class="text-slate-400 mb-8 text-sm"></p>
+
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-left space-y-4">
+      <div id="step-pod" class="flex items-center gap-3 step-active">
+        <span id="step-pod-icon" class="text-lg">⟳</span>
+        <div>
+          <p class="font-medium text-sm">Starting your DeerFlow instance</p>
+          <p class="text-xs text-slate-500">Allocating Kubernetes pod and storage volume…</p>
+        </div>
+      </div>
+      <div id="step-auth" class="flex items-center gap-3 step-wait">
+        <span id="step-auth-icon" class="text-lg">○</span>
+        <div>
+          <p class="font-medium text-sm">Initializing AI engine</p>
+          <p class="text-xs text-slate-500">Setting up DeerFlow runtime and agents…</p>
+        </div>
+      </div>
+      <div id="step-ready" class="flex items-center gap-3 step-wait">
+        <span id="step-ready-icon" class="text-lg">○</span>
+        <div>
+          <p class="font-medium text-sm">Ready to use</p>
+          <p class="text-xs text-slate-500">Connecting to your workspace…</p>
+        </div>
+      </div>
     </div>
 
-    <script>
-        const API_BASE_URL = 'http://localhost:8000'; // Points to your local Python API backend
-        let isLoginMode = true;
+    <p class="text-slate-600 text-xs mt-6">This takes ~30–60 seconds on first launch</p>
+  </div>
+</div>
 
-        // DOM Elements
-        const authCard = document.getElementById('auth-card');
-        const dashboardCard = document.getElementById('dashboard-card');
-        const authForm = document.getElementById('auth-form');
-        const authTitle = document.getElementById('auth-title');
-        const submitBtn = document.getElementById('submit-btn');
-        const toggleAuthMode = document.getElementById('toggle-auth-mode');
-        const toggleText = document.getElementById('toggle-text');
-        const userDisplay = document.getElementById('user-display');
-        const envLoading = document.getElementById('env-loading');
-        const envReady = document.getElementById('env-ready');
-        const launchBtn = document.getElementById('launch-btn');
-        const logoutBtn = document.getElementById('logout-btn');
+<!-- ═══════════════ CHAT SCREEN ═══════════════ -->
+<div id="screen-chat" class="hidden flex-1 flex flex-col overflow-hidden">
 
-        // Toggle between Login and Registration views
-        toggleAuthMode.addEventListener('click', () => {
-            isLoginMode = !isLoginMode;
-            authTitle.innerText = isLoginMode ? 'Login to Workspace' : 'Create an Account';
-            submitBtn.innerText = isLoginMode ? 'Sign In' : 'Register';
-            toggleText.innerText = isLoginMode ? "Don't have an account?" : "Already have an account?";
-            toggleAuthMode.innerText = isLoginMode ? 'Sign Up' : 'Sign In';
-        });
+  <!-- Header -->
+  <header class="flex items-center gap-3 px-4 py-3 bg-slate-900 border-b border-slate-800 shrink-0">
+    <span class="text-2xl">🦌</span>
+    <div class="flex-1 min-w-0">
+      <h1 class="font-bold text-white leading-none">DeerFlow</h1>
+      <p id="chat-subtitle" class="text-xs text-slate-500 mt-0.5 truncate"></p>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="status-dot" class="h-2 w-2 rounded-full bg-green-400 shadow-sm shadow-green-400/50"></span>
+      <span id="status-label" class="text-xs text-slate-400">Connected</span>
+      <span class="text-slate-700">|</span>
+      <button onclick="doLogout()"
+        class="text-xs text-slate-400 hover:text-white transition px-2 py-1 rounded-lg hover:bg-slate-800">
+        Logout
+      </button>
+    </div>
+  </header>
 
-        // Handle Form Submission (Login or Register)
-        authForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const endpoint = isLoginMode ? '/api/login' : '/api/register';
+  <!-- Messages -->
+  <div id="messages" class="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+    <!-- Filled by JS -->
+  </div>
 
-            try {
-                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
+  <!-- Input -->
+  <div class="px-4 py-3 bg-slate-900 border-t border-slate-800 shrink-0">
+    <form id="chat-form" onsubmit="sendMessage(event)" class="flex gap-2 items-end">
+      <textarea id="chat-input"
+        class="flex-1 resize-none bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white
+               placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition
+               max-h-36 overflow-y-auto"
+        placeholder="Ask DeerFlow anything…"
+        rows="1"
+        onkeydown="handleInputKey(event)"></textarea>
+      <button type="submit" id="send-btn"
+        class="shrink-0 w-10 h-10 flex items-center justify-center bg-indigo-600 hover:bg-indigo-500
+               rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+      </button>
+    </form>
+    <p class="text-xs text-slate-600 mt-1.5 text-center">Powered by DeerFlow · your isolated AI workspace</p>
+  </div>
 
-                const data = await response.json();
+</div>
 
-                if (!response.ok) throw new Error(data.detail || 'Authentication failed');
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
 
-                if (isLoginMode) {
-                    // Store JWT token and initialize dashboard
-                    localStorage.setItem('token', data.access_token);
-                    localStorage.setItem('username', username);
-                    showDashboard(username);
-                } else {
-                    alert('Registration successful! Please sign in.');
-                    toggleAuthMode.click(); // Flip back to login view
-                }
-            } catch (err) {
-                alert(err.message);
-            }
-        });
+let token = localStorage.getItem('df_token') || '';
+let username = localStorage.getItem('df_user') || '';
+let authMode = 'login';
+let isStreaming = false;
+let pollTimer = null;
+let conversationHistory = []; // [{role, content}]
 
-        // Show Dashboard and spin up K8s environment
-        function showDashboard(username) {
-            authCard.classList.add('hidden');
-            dashboardCard.classList.remove('hidden');
-            userDisplay.innerText = username;
+// ─── Auth Mode Toggle ─────────────────────────────────────────────────────────
 
-            // Trigger Kubernetes pod creation via the backend
-            provisionKubernetesEnvironment();
-        }
+function setAuthMode(mode) {
+  authMode = mode;
+  const isLogin = mode === 'login';
+  document.getElementById('tab-login').className =
+    `flex-1 py-2 rounded-lg text-sm font-medium transition-all ${isLogin ? 'bg-slate-700 text-white shadow' : 'text-slate-400'}`;
+  document.getElementById('tab-register').className =
+    `flex-1 py-2 rounded-lg text-sm font-medium transition-all ${!isLogin ? 'bg-slate-700 text-white shadow' : 'text-slate-400'}`;
+  document.getElementById('auth-submit').textContent = isLogin ? 'Sign In' : 'Create Account';
+  document.getElementById('inp-password').autocomplete = isLogin ? 'current-password' : 'new-password';
+  clearAuthError();
+}
 
-        // Poll Python Backend until the K8s Pod is running and ready
-        async function provisionKubernetesEnvironment() {
-            const token = localStorage.getItem('token');
-            const username = localStorage.getItem('username');
+// ─── Auth Submit ──────────────────────────────────────────────────────────────
 
-            try {
-                // Request backend to spawn pod/PVC
-                const response = await fetch(`${API_BASE_URL}/api/spawn`, {
-                    method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+async function submitAuth(e) {
+  e.preventDefault();
+  const uname = document.getElementById('inp-username').value.trim();
+  const pwd   = document.getElementById('inp-password').value;
+  const btn   = document.getElementById('auth-submit');
 
-                if (!response.ok) throw new Error('Failed to initiate cluster environment');
+  btn.disabled = true;
+  btn.textContent = authMode === 'login' ? 'Signing in…' : 'Creating account…';
+  clearAuthError();
 
-                // Poll the status endpoint until the Pod status is "Running"
-                const pollInterval = setInterval(async () => {
-                    const statusRes = await fetch(`${API_BASE_URL}/api/status`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    const statusData = await statusRes.json();
+  try {
+    if (authMode === 'register') {
+      const r = await api('/register', 'POST', { username: uname, password: pwd });
+      if (!r.ok) { showAuthError((await r.json()).detail || 'Registration failed'); return; }
+      setAuthMode('login');
+      document.getElementById('inp-password').value = '';
+      showAuthError('Account created — please sign in.', true);
+      return;
+    }
 
-                    if (statusData.status === 'Running') {
-                        clearInterval(pollInterval);
+    const r = await api('/login', 'POST', { username: uname, password: pwd });
+    const data = await r.json();
+    if (!r.ok) { showAuthError(data.detail || 'Login failed'); return; }
 
-                        // Show Ready State
-                        envLoading.classList.add('hidden');
-                        envReady.classList.remove('hidden');
+    token = data.access_token;
+    username = uname;
+    localStorage.setItem('df_token', token);
+    localStorage.setItem('df_user', username);
+    startLoading();
 
-                        // Set button action to point to the user's specific route via Minikube Ingress
-                        launchBtn.onclick = () => {
-                            window.location.href = `http://localhost/user/${username}`;
-                        };
-                    }
-                }, 3000); // Check every 3 seconds
+  } finally {
+    btn.disabled = false;
+    btn.textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
+  }
+}
 
-            } catch (err) {
-                alert(`Kubernetes Orchestration Error: ${err.message}`);
-            }
-        }
+function showAuthError(msg, isInfo = false) {
+  const el = document.getElementById('auth-error');
+  el.textContent = msg;
+  el.className = `text-sm rounded-lg px-3 py-2 ${isInfo
+    ? 'text-green-400 bg-green-900/20 border border-green-800/40'
+    : 'text-red-400 bg-red-900/20 border border-red-800/40'}`;
+  el.classList.remove('hidden');
+}
+function clearAuthError() {
+  document.getElementById('auth-error').classList.add('hidden');
+}
 
-        // Log Out
-        logoutBtn.addEventListener('click', () => {
-            localStorage.clear();
-            window.location.reload();
-        });
+// ─── Loading / Pod Polling ────────────────────────────────────────────────────
 
-        // Check session on page load
-        window.onload = () => {
-            const savedToken = localStorage.getItem('token');
-            const savedUser = localStorage.getItem('username');
-            if (savedToken && savedUser) {
-                showDashboard(savedUser);
-            }
-        };
-    </script>
+function startLoading() {
+  show('screen-loading');
+  document.getElementById('loading-user').textContent = `Hi ${username}, preparing your workspace…`;
+  setStep('pod', 'active');
+  setStep('auth', 'wait');
+  setStep('ready', 'wait');
+  pollPodReady();
+}
+
+async function pollPodReady() {
+  try {
+    const r = await api('/me', 'GET');
+    if (!r.ok) { showScreen('auth'); return; }
+    const data = await r.json();
+
+    if (data.pod_ready) {
+      setStep('pod', 'done');
+      setStep('auth', 'active');
+      // Give DeerFlow a moment to init before transitioning
+      await sleep(2000);
+      setStep('auth', 'done');
+      setStep('ready', 'active');
+      await sleep(800);
+      setStep('ready', 'done');
+      await sleep(400);
+      enterChat();
+    } else {
+      pollTimer = setTimeout(pollPodReady, 3000);
+    }
+  } catch {
+    pollTimer = setTimeout(pollPodReady, 5000);
+  }
+}
+
+function setStep(name, state) {
+  const el   = document.getElementById(`step-${name}`);
+  const icon = document.getElementById(`step-${name}-icon`);
+  el.className = `flex items-center gap-3 step-${state}`;
+  icon.textContent = state === 'done' ? '✓' : state === 'active' ? '⟳' : '○';
+}
+
+// ─── Chat Screen ──────────────────────────────────────────────────────────────
+
+function enterChat() {
+  show('screen-chat');
+  document.getElementById('chat-subtitle').textContent = `Logged in as ${username} · isolated workspace`;
+  appendSystemMessage('👋 Welcome! Your DeerFlow workspace is ready. Ask me anything.');
+  document.getElementById('chat-input').focus();
+}
+
+async function doLogout() {
+  clearTimeout(pollTimer);
+  try { await api('/logout', 'POST'); } catch {}
+  token = ''; username = '';
+  localStorage.removeItem('df_token');
+  localStorage.removeItem('df_user');
+  conversationHistory = [];
+  document.getElementById('messages').innerHTML = '';
+  show('screen-auth');
+}
+
+// ─── Sending Messages ─────────────────────────────────────────────────────────
+
+async function sendMessage(e) {
+  e.preventDefault();
+  if (isStreaming) return;
+
+  const input = document.getElementById('chat-input');
+  const text  = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+
+  appendUserMessage(text);
+  conversationHistory.push({ role: 'user', content: text });
+
+  const aiBubble = appendAiMessage('');
+  setStreaming(true);
+
+  try {
+    const payload = {
+      assistant_id: 'lead_agent',
+      input: { messages: conversationHistory.slice(-20) }, // last 20 turns context
+      stream_mode: ['messages-tuple'],
+      on_completion: 'delete',
+    };
+
+    const resp = await fetch('/api/runs/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'text/event-stream',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.text();
+      aiBubble.textContent = `Error ${resp.status}: ${err}`;
+      return;
+    }
+
+    let fullText = '';
+    for await (const { event, data } of parseSSE(resp)) {
+      if (event === 'messages' || event === 'messages-tuple') {
+        try {
+          const parsed = JSON.parse(data);
+          const chunk = Array.isArray(parsed) ? parsed[0] : parsed;
+          const meta = Array.isArray(parsed) ? parsed[1] : null;
+          // Only accumulate AI message chunks from the main model node (not title middleware)
+          const isAiChunk = chunk?.type === 'AIMessageChunk' || chunk?.type === 'ai';
+          const isTitleMiddleware = meta?.tags?.includes?.('middleware:title');
+          if (isAiChunk && !isTitleMiddleware && chunk.content && typeof chunk.content === 'string') {
+            fullText += chunk.content;
+            renderMessage(aiBubble, fullText);
+            scrollToBottom();
+          }
+        } catch {}
+      } else if (event === 'error') {
+        aiBubble.textContent = `Error: ${data}`;
+      }
+    }
+
+    if (fullText) {
+      conversationHistory.push({ role: 'assistant', content: fullText });
+    }
+  } catch (err) {
+    aiBubble.textContent = `Connection error: ${err.message}`;
+  } finally {
+    setStreaming(false);
+    scrollToBottom();
+  }
+}
+
+// ─── SSE Parser ───────────────────────────────────────────────────────────────
+
+async function* parseSSE(response) {
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let currentEvent = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // keep incomplete last line
+
+    for (const line of lines) {
+      if (line.startsWith('event: ')) {
+        currentEvent = line.slice(7).trim();
+      } else if (line.startsWith('data: ')) {
+        yield { event: currentEvent, data: line.slice(6) };
+        currentEvent = '';
+      }
+    }
+  }
+}
+
+// ─── Message Rendering ────────────────────────────────────────────────────────
+
+function appendUserMessage(text) {
+  const msg = document.createElement('div');
+  msg.className = 'msg-user max-w-[80%] px-4 py-2.5 text-sm text-white';
+  msg.textContent = text;
+  document.getElementById('messages').appendChild(msg);
+  scrollToBottom();
+  return msg;
+}
+
+function appendAiMessage(text) {
+  const wrap = document.createElement('div');
+  wrap.className = 'msg-ai max-w-[85%] px-4 py-3 text-sm text-slate-100';
+  if (!text) {
+    // Typing indicator
+    wrap.innerHTML = `<span class="flex gap-1">
+      <span class="typing-dot w-1.5 h-1.5 bg-slate-400 rounded-full"></span>
+      <span class="typing-dot w-1.5 h-1.5 bg-slate-400 rounded-full"></span>
+      <span class="typing-dot w-1.5 h-1.5 bg-slate-400 rounded-full"></span>
+    </span>`;
+  }
+  document.getElementById('messages').appendChild(wrap);
+  scrollToBottom();
+  return wrap;
+}
+
+function appendSystemMessage(text) {
+  const msg = document.createElement('div');
+  msg.className = 'msg-system max-w-sm px-4 py-2 text-xs';
+  msg.textContent = text;
+  document.getElementById('messages').appendChild(msg);
+  scrollToBottom();
+}
+
+function renderMessage(el, text) {
+  // Simple markdown-ish rendering: code blocks, inline code, bold
+  let html = escapeHtml(text)
+    .replace(/```([\s\S]*?)```/g, '<div class="code-block"><code>$1</code></div>')
+    .replace(/`([^`]+)`/g, '<code class="bg-slate-800 px-1 rounded text-indigo-300">$1</code>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+  el.innerHTML = html;
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function scrollToBottom() {
+  const el = document.getElementById('messages');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ─── UI Helpers ───────────────────────────────────────────────────────────────
+
+function show(screenId) {
+  ['screen-auth', 'screen-loading', 'screen-chat'].forEach(id => {
+    const el = document.getElementById(id);
+    if (id === screenId) { el.classList.remove('hidden'); el.classList.add('flex'); }
+    else                  { el.classList.add('hidden');    el.classList.remove('flex'); }
+  });
+}
+
+function setStreaming(active) {
+  isStreaming = active;
+  document.getElementById('send-btn').disabled = active;
+  document.getElementById('chat-input').disabled = active;
+}
+
+function handleInputKey(e) {
+  // Auto-resize textarea
+  e.target.style.height = 'auto';
+  e.target.style.height = Math.min(e.target.scrollHeight, 144) + 'px';
+  // Submit on Enter (not Shift+Enter)
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    document.getElementById('chat-form').requestSubmit();
+  }
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function api(path, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (token) opts.headers['Authorization'] = `Bearer ${token}`;
+  if (body)  opts.body = JSON.stringify(body);
+  return fetch(path, opts);
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+
+window.addEventListener('load', () => {
+  if (token && username) {
+    startLoading();
+  } else {
+    show('screen-auth');
+  }
+});
+</script>
 </body>
 </html>

@@ -13,12 +13,24 @@ data:
     log_level: info
     token_usage:
       enabled: false
-    models: []
+    # Models use env var references — inject actual keys via the deerflow-api-keys Secret.
+    models:
+    - name: DeepSeek V3
+      display_name: DeepSeek V3
+      use: langchain_openai:ChatOpenAI
+      model: deepseek-chat
+      base_url: https://api.deepseek.com
+      api_key: $DEEPSEEK_API_KEY
+      timeout: 600.0
+      max_retries: 2
     tool_groups:
     - name: web
     - name: file:read
     - name: file:write
     - name: bash
+    database:
+      backend: sqlite
+      sqlite_dir: /app/.deer-flow/data
     sandbox:
       use: deerflow.sandbox.local:LocalSandboxProvider
       allow_host_bash: true

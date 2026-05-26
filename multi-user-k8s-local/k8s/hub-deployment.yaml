@@ -13,6 +13,20 @@ data:
   secret-key: Y2hhbmdlLW1lLWluLXByb2R1Y3Rpb24=
 
 ---
+# API keys injected into every user pod.
+# Update this Secret with real values before deploying.
+# Example: kubectl create secret generic deerflow-api-keys -n deerflow \
+#   --from-literal=OPENAI_API_KEY=sk-... --dry-run=client -o yaml | kubectl apply -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: deerflow-api-keys
+  namespace: deerflow
+type: Opaque
+stringData:
+  DEEPSEEK_API_KEY: "replace-with-your-deepseek-key"
+
+---
 # PersistentVolumeClaim for the Hub's SQLite database.
 apiVersion: v1
 kind: PersistentVolumeClaim
