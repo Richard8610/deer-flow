@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Sidebar } from './components/Sidebar';
 import { Canvas } from './components/Canvas';
 import { Inspector } from './components/Inspector';
@@ -7,16 +7,24 @@ import { ChatPanel } from './components/ChatPanel';
 import { useWorkflow } from './store/useWorkflow';
 import { APP } from './workflow.config';
 import { fetchProjects, fetchWorkflow, saveWorkflow } from './api';
+import { clearToken } from './auth';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 export default function App() {
+  const navigate = useNavigate();
   const { nodes, edges, selectedNodeId, importJSON } = useWorkflow();
 
   const [projects, setProjects]           = useState<string[]>([]);
   const [activeProject, setActiveProject] = useState('');
   const [saveStatus, setSaveStatus]       = useState<SaveStatus>('idle');
   const [showChat, setShowChat]           = useState(false);
+
+  const handleLogout = useCallback(() => {
+    clearToken();
+    void fetch('/logout', { method: 'POST' }).catch(() => {});
+    navigate('/login', { replace: true });
+  }, [navigate]);
 
   const saveTimer        = useRef<ReturnType<typeof setTimeout>>();
   const activeProjectRef = useRef('');
@@ -146,6 +154,8 @@ export default function App() {
             GitHub ↗
           </a>
         )}
+
+        <button className="topbar__logout" onClick={handleLogout}>Sign out</button>
       </header>
 
       <div className="layout">

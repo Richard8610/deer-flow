@@ -12,8 +12,12 @@ Endpoints:
 """
 
 import asyncio
+import json
 import logging
 import os
+import re
+import time
+from pathlib import Path
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, status
@@ -231,6 +235,66 @@ async def logout(current_user: dict = Depends(get_current_user)) -> dict:
     except Exception as exc:
         logger.warning("Error deleting pod for %s: %s", current_user["username"], exc)
     return {"message": "Logged out. Your pod has been stopped; data is preserved."}
+
+
+# ---------------------------------------------------------------------------
+# Workflow project persistence: /api/workflow/*
+# Stored per-user on the hub's PVC at /data/projects/{user_id}/{project}/
+# Must be registered BEFORE the catch-all /api/{path} proxy.
+# ---------------------------------------------------------------------------
+
+def _projects_root(user_id: str) -> Path:
+    root = Path(settings.db_path).parent / "projects" / user_id
+    root.mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def _safe_project_path(user_id: str, name: str) -> Path:
+    root = _projects_root(user_id)
+    resolved = (root / name).resolve()
+    if not resolved.is_relative_to(root.resolve()):
+        raise HTTPException(status_code=400, detail="Invalid project name")
+    return resolved
+
+
+@app.get("/api/workflow/projects")
+async def list_projects(current_user: dict = Depends(get_current_user)) -> dict:
+    root = _projects_root(str(current_user["id"]))
+    projects = sorted(d.name for d in root.iterdir() if d.is_dir() and not d.name.startswith("."))
+    return {"projects": projects}
+
+
+@app.get("/api/workflow/projects/{name}")
+async def get_workflow(name: str, current_user: dict = Depends(get_current_user)) -> dict:
+    project_dir = _safe_project_path(str(current_user["id"]), name)
+    wf_file = project_dir / "workflow.json"
+    if not project_dir.exists() or not project_dir.is_dir():
+        raise HTTPException(status_code=404, detail=f"Project '{name}' not found")
+    if wf_file.exists():
+        return json.loads(wf_file.read_text(encoding="utf-8"))
+    return {"nodes": [], "edges": []}
+
+
+@app.put("/api/workflow/projects/{name}")
+async def save_workflow_endpoint(name: str, request: Request, current_user: dict = Depends(get_current_user)) -> dict:
+    body = await request.json()
+    project_dir = _safe_project_path(str(current_user["id"]), name)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    wf_file = project_dir / "workflow.json"
+    wf_file.write_text(json.dumps(body, indent=2, ensure_ascii=False), encoding="utf-8")
+    return {"ok": True}
+
+
+@app.post("/api/workflow/projects")
+async def create_project(request: Request, current_user: dict = Depends(get_current_user)) -> dict:
+    body = await request.json()
+    raw_name: str = body.get("name") or f"ai-workflow-{int(time.time())}"
+    name = re.sub(r"[^a-zA-Z0-9_-]", "_", raw_name).strip("_-")[:80] or f"ai-workflow-{int(time.time())}"
+    project_dir = _safe_project_path(str(current_user["id"]), name)
+    project_dir.mkdir(parents=True, exist_ok=True)
+    wf_file = project_dir / "workflow.json"
+    wf_file.write_text(json.dumps(body.get("data", {}), indent=2, ensure_ascii=False), encoding="utf-8")
+    return {"ok": True, "name": name}
 
 
 # ---------------------------------------------------------------------------

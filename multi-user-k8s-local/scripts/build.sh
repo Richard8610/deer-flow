@@ -1,10 +1,19 @@
 #!/bin/bash
 set -e
 
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+echo "Building workflow frontend (React/Vite)..."
+cd "$REPO_ROOT/workflow_frontend"
+npm install --silent
+npm run build
+# Copy dist into the Docker build context for the hub image
+rm -rf "$REPO_ROOT/multi-user-k8s-local/workflow_frontend_dist"
+cp -r dist/ "$REPO_ROOT/multi-user-k8s-local/workflow_frontend_dist"
+cd "$REPO_ROOT"
+
 echo "Pointing Docker CLI to Minikube's Docker daemon..."
 eval $(minikube docker-env)
-
-REPO_ROOT=$(git rev-parse --show-toplevel)
 
 echo "Building hub image (context: multi-user-k8s-local/)..."
 docker build -t deerflow-hub:latest \

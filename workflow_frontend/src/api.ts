@@ -1,3 +1,5 @@
+import { authFetch, authHeaders } from './auth';
+
 const BASE = '/api/workflow';
 
 // ── Chat streaming ──────────────────────────────────────────────────────────
@@ -8,7 +10,7 @@ export interface ChatMessage {
 }
 
 /**
- * Stream a chat turn to the project_agent via the persistence server.
+ * Stream a chat turn to the lead_agent via the hub proxy.
  * Calls `onChunk` for each AI text fragment, `onError` on failure.
  */
 export async function streamChat(
@@ -18,10 +20,20 @@ export async function streamChat(
   onError: (msg: string) => void,
   options?: { model?: string },
 ): Promise<void> {
-  const resp = await fetch('/api/chat/stream', {
+  const payload = {
+    assistant_id: 'lead_agent',
+    input: { messages },
+    stream_mode: ['messages-tuple'],
+    on_completion: 'delete',
+    ...(options?.model || project
+      ? { config: { configurable: { ...(options?.model ? { model_name: options.model } : {}), ...(project ? { project } : {}) } } }
+      : {}),
+  };
+
+  const resp = await fetch('/api/runs/stream', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, project, model: options?.model ?? '' }),
+    headers: { 'Content-Type': 'application/json', 'Accept': 'text/event-stream', ...authHeaders() },
+    body: JSON.stringify(payload),
   });
   if (!resp.ok) {
     onError(`Server error: HTTP ${resp.status}`);
@@ -46,12 +58,12 @@ export async function streamChat(
           return;
         }
 
-        // Gateway may emit 'messages-tuple' or fall back to 'messages' — handle both
         if (event === 'messages-tuple' || event === 'messages') {
           try {
-            const [chunk] = JSON.parse(raw) as [{ content: unknown; type: string }];
-            // Only forward plain-text AI chunks (skip tool calls, human msgs, etc.)
-            if (chunk.type === 'AIMessageChunk' && typeof chunk.content === 'string' && chunk.content) {
+            const parsed = JSON.parse(raw) as [{ content: unknown; type: string }, Record<string, unknown>?];
+            const [chunk, meta] = parsed;
+            const isTitleMiddleware = (meta?.tags as string[] | undefined)?.includes('middleware:title');
+            if (chunk.type === 'AIMessageChunk' && !isTitleMiddleware && typeof chunk.content === 'string' && chunk.content) {
               onChunk(chunk.content);
             }
           } catch { /* malformed chunk — ignore */ }
@@ -64,7 +76,6 @@ export async function streamChat(
     const { done, value } = await reader.read();
     if (done) break;
     buf += decoder.decode(value, { stream: true });
-    // SSE events are separated by blank lines
     const blocks = buf.split('\n\n');
     buf = blocks.pop() ?? '';
     for (const block of blocks) processBlock(block);
@@ -78,25 +89,36 @@ export interface WorkflowData {
 }
 
 export async function fetchProjects(): Promise<string[]> {
-  const r = await fetch(`${BASE}/projects`);
+  const r = await authFetch(`${BASE}/projects`);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   const data = (await r.json()) as { projects: string[] };
   return data.projects;
 }
 
 export async function fetchWorkflow(project: string): Promise<WorkflowData> {
-  const r = await fetch(`${BASE}/projects/${encodeURIComponent(project)}`);
+  const r = await authFetch(`${BASE}/projects/${encodeURIComponent(project)}`);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json() as Promise<WorkflowData>;
 }
 
 export async function saveWorkflow(project: string, data: WorkflowData): Promise<void> {
-  const r = await fetch(`${BASE}/projects/${encodeURIComponent(project)}`, {
+  const r = await authFetch(`${BASE}/projects/${encodeURIComponent(project)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
+}
+
+export async function createWorkflow(name: string, data: WorkflowData): Promise<string> {
+  const r = await authFetch(`${BASE}/projects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, data }),
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const resp = (await r.json()) as { name: string };
+  return resp.name;
 }
 
 export interface Skill {
@@ -111,15 +133,21 @@ export interface Model {
 }
 
 export async function fetchModels(): Promise<Model[]> {
-  const r = await fetch('/api/models');
+  const r = await authFetch('/api/models');
   if (!r.ok) return [];
   const data = (await r.json()) as { models: Model[] };
   return data.models;
 }
 
 export async function fetchSkills(): Promise<Skill[]> {
-  const r = await fetch('/api/skills');
+  const r = await authFetch('/api/skills');
   if (!r.ok) return [];
   const data = (await r.json()) as { skills: Skill[] };
   return data.skills;
+}
+
+export async function fetchMe(): Promise<{ username: string; pod_ready: boolean }> {
+  const r = await authFetch('/me');
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json() as Promise<{ username: string; pod_ready: boolean }>;
 }

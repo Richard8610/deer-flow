@@ -61,3 +61,4 @@ config.yaml.bak
 /frontend/playwright-report/
 .gstack/
 .worktrees
+multi-user-k8s-local/workflow_frontend_dist/
