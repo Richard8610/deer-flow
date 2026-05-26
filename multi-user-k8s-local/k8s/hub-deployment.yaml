@@ -53,12 +53,12 @@ spec:
           ports:
             - containerPort: 8080
           env:
-            - name: SECRET_KEY
+            - name: HUB_CFG_SECRET_KEY
               valueFrom:
                 secretKeyRef:
                   name: hub-secrets
                   key: secret-key
-            - name: DB_PATH
+            - name: HUB_CFG_DB_PATH
               value: /data/users.db
           volumeMounts:
             - name: hub-data

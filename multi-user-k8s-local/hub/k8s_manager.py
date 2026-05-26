@@ -21,6 +21,17 @@ def _load_kube_config() -> None:
     """Load Kubernetes config: in-cluster first, then local kubeconfig."""
     try:
         k8s_config.load_incluster_config()
+        # SDK v36 bug: load_incluster_config stores token under 'authorization' key
+        # (as "bearer <jwt>") but auth_settings() only checks for 'BearerToken'.
+        # Fix: move the raw JWT to 'BearerToken' with 'Bearer' prefix.
+        cfg = client.Configuration.get_default_copy()
+        if "authorization" in cfg.api_key and "BearerToken" not in cfg.api_key:
+            raw = cfg.api_key.pop("authorization")
+            # Strip any existing "bearer " prefix from the stored value
+            jwt = raw.split(" ", 1)[-1] if " " in raw else raw
+            cfg.api_key["BearerToken"] = jwt
+            cfg.api_key_prefix["BearerToken"] = "Bearer"
+            client.Configuration.set_default(cfg)
         logger.info("Loaded in-cluster Kubernetes config.")
     except k8s_config.ConfigException:
         k8s_config.load_kube_config()
@@ -177,7 +188,13 @@ def _ensure_pod(core_v1: client.CoreV1Api, user_id: str) -> None:
                         client.V1VolumeMount(
                             name="user-data",
                             mount_path="/app/.deer-flow",
-                        )
+                        ),
+                        client.V1VolumeMount(
+                            name="deerflow-config",
+                            mount_path="/app/config.yaml",
+                            sub_path="config.yaml",
+                            read_only=True,
+                        ),
                     ],
                 )
             ],
@@ -187,7 +204,13 @@ def _ensure_pod(core_v1: client.CoreV1Api, user_id: str) -> None:
                     persistent_volume_claim=client.V1PersistentVolumeClaimVolumeSource(
                         claim_name=_pvc_name(user_id)
                     ),
-                )
+                ),
+                client.V1Volume(
+                    name="deerflow-config",
+                    config_map=client.V1ConfigMapVolumeSource(
+                        name="deerflow-user-config",
+                    ),
+                ),
             ],
         ),
     )

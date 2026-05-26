@@ -1,25 +1,15 @@
 # DeerFlow User Pod Image
 #
-# This Dockerfile is meant to be built from the `backend/` directory of the DeerFlow repo:
+# Build from the REPO ROOT using the existing backend Dockerfile:
 #
 #   docker build -t deerflow-user-pod:latest \
-#     -f multi-user-k8s-local/user-pod/Dockerfile \
-#     backend/
+#     --target runtime \
+#     -f backend/Dockerfile \
+#     .
 #
-# The build context must be the backend/ directory so that the DeerFlow source
-# code and its requirements.txt are available.
+# The build context must be the repo root so backend/ is available.
+#
+# This file is kept as documentation; see src/build.sh for the actual command.
 
-FROM python:3.12-slim
-WORKDIR /app
-
-# Install DeerFlow backend dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy backend source
-COPY . .
-
-RUN mkdir -p /app/.deer-flow
-
-EXPOSE 8001
-CMD ["python", "-m", "uvicorn", "app.gateway.app:app", "--host", "0.0.0.0", "--port", "8001"]
+# Actual image uses backend/Dockerfile --target runtime
+# See build.sh for the build command.

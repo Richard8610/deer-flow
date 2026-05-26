@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Workspace Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-900 text-white font-sans min-h-screen flex items-center justify-center">
+
+    <div id="auth-card" class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-md">
+        <h2 id="auth-title" class="text-3xl font-bold mb-6 text-center text-indigo-400">Login to Workspace</h2>
+
+        <form id="auth-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-400">Username</label>
+                <input type="text" id="username" required class="w-full mt-1 p-3 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-400">Password</label>
+                <input type="password" id="password" required class="w-full mt-1 p-3 rounded bg-gray-700 border border-gray-600 focus:outline-none focus:border-indigo-500">
+            </div>
+            <button type="submit" id="submit-btn" class="w-full py-3 mt-2 bg-indigo-600 hover:bg-indigo-700 rounded font-semibold transition duration-200">
+                Sign In
+            </button>
+        </form>
+
+        <p class="mt-6 text-sm text-center text-gray-400">
+            <span id="toggle-text">Don't have an account?</span>
+            <button id="toggle-auth-mode" class="text-indigo-400 hover:underline ml-1 focus:outline-none">Sign Up</button>
+        </p>
+    </div>
+
+    <div id="dashboard-card" class="hidden bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-2xl text-center">
+        <h2 class="text-3xl font-bold mb-2">Welcome, <span id="user-display" class="text-indigo-400">User</span>!</h2>
+        <p class="text-gray-400 mb-6">Initializing your isolated Kubernetes cloud environment...</p>
+
+        <div id="env-loading" class="space-y-4">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-indigo-500 mx-auto"></div>
+            <p class="text-sm text-yellow-400 animate-pulse">Mounting your personal filesystem storage (PVC)...</p>
+        </div>
+
+        <div id="env-ready" class="hidden space-y-4">
+            <div class="bg-green-900/30 border border-green-500 p-4 rounded text-green-400">
+                ✓ Environment successfully provisioned in Minikube!
+            </div>
+            <button id="launch-btn" class="w-full py-4 bg-green-600 hover:bg-green-700 rounded-lg text-lg font-bold shadow-lg transform hover:scale-[1.01] transition duration-200">
+                Open My Workspace
+            </button>
+        </div>
+
+        <button id="logout-btn" class="mt-8 text-sm text-gray-500 hover:text-gray-300 underline">Log Out</button>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000'; // Points to your local Python API backend
+        let isLoginMode = true;
+
+        // DOM Elements
+        const authCard = document.getElementById('auth-card');
+        const dashboardCard = document.getElementById('dashboard-card');
+        const authForm = document.getElementById('auth-form');
+        const authTitle = document.getElementById('auth-title');
+        const submitBtn = document.getElementById('submit-btn');
+        const toggleAuthMode = document.getElementById('toggle-auth-mode');
+        const toggleText = document.getElementById('toggle-text');
+        const userDisplay = document.getElementById('user-display');
+        const envLoading = document.getElementById('env-loading');
+        const envReady = document.getElementById('env-ready');
+        const launchBtn = document.getElementById('launch-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+
+        // Toggle between Login and Registration views
+        toggleAuthMode.addEventListener('click', () => {
+            isLoginMode = !isLoginMode;
+            authTitle.innerText = isLoginMode ? 'Login to Workspace' : 'Create an Account';
+            submitBtn.innerText = isLoginMode ? 'Sign In' : 'Register';
+            toggleText.innerText = isLoginMode ? "Don't have an account?" : "Already have an account?";
+            toggleAuthMode.innerText = isLoginMode ? 'Sign Up' : 'Sign In';
+        });
+
+        // Handle Form Submission (Login or Register)
+        authForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const endpoint = isLoginMode ? '/api/login' : '/api/register';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.detail || 'Authentication failed');
+
+                if (isLoginMode) {
+                    // Store JWT token and initialize dashboard
+                    localStorage.setItem('token', data.access_token);
+                    localStorage.setItem('username', username);
+                    showDashboard(username);
+                } else {
+                    alert('Registration successful! Please sign in.');
+                    toggleAuthMode.click(); // Flip back to login view
+                }
+            } catch (err) {
+                alert(err.message);
+            }
+        });
+
+        // Show Dashboard and spin up K8s environment
+        function showDashboard(username) {
+            authCard.classList.add('hidden');
+            dashboardCard.classList.remove('hidden');
+            userDisplay.innerText = username;
+
+            // Trigger Kubernetes pod creation via the backend
+            provisionKubernetesEnvironment();
+        }
+
+        // Poll Python Backend until the K8s Pod is running and ready
+        async function provisionKubernetesEnvironment() {
+            const token = localStorage.getItem('token');
+            const username = localStorage.getItem('username');
+
+            try {
+                // Request backend to spawn pod/PVC
+                const response = await fetch(`${API_BASE_URL}/api/spawn`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to initiate cluster environment');
+
+                // Poll the status endpoint until the Pod status is "Running"
+                const pollInterval = setInterval(async () => {
+                    const statusRes = await fetch(`${API_BASE_URL}/api/status`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const statusData = await statusRes.json();
+
+                    if (statusData.status === 'Running') {
+                        clearInterval(pollInterval);
+
+                        // Show Ready State
+                        envLoading.classList.add('hidden');
+                        envReady.classList.remove('hidden');
+
+                        // Set button action to point to the user's specific route via Minikube Ingress
+                        launchBtn.onclick = () => {
+                            window.location.href = `http://localhost/user/${username}`;
+                        };
+                    }
+                }, 3000); // Check every 3 seconds
+
+            } catch (err) {
+                alert(`Kubernetes Orchestration Error: ${err.message}`);
+            }
+        }
+
+        // Log Out
+        logoutBtn.addEventListener('click', () => {
+            localStorage.clear();
+            window.location.reload();
+        });
+
+        // Check session on page load
+        window.onload = () => {
+            const savedToken = localStorage.getItem('token');
+            const savedUser = localStorage.getItem('username');
+            if (savedToken && savedUser) {
+                showDashboard(savedUser);
+            }
+        };
+    </script>
+</body>
+</html>
