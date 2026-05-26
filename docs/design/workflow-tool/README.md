@@ -40,6 +40,8 @@
 | --- | --- |
 | Coze 调研与契合度 | [../project-agent/coze-workflow-research.md](../project-agent/coze-workflow-research.md)、[coze-fit-analysis.md](../project-agent/coze-fit-analysis.md) |
 | 一节点一 Python 文件（演进） | [../project-agent/python-node-design.md](../project-agent/python-node-design.md) |
-| 企业部署 / 沙箱伸缩 | [../project-agent/enterprise-deployment.md](../project-agent/enterprise-deployment.md) |
+| K8s 概念 / 标准部署 | [../deployment/standard-deployment.md](../deployment/standard-deployment.md) |
+| 标准部署 vs Minikube 方案对比 | [../deployment/standard-vs-minikube.md](../deployment/standard-vs-minikube.md) |
+| 企业部署 / 沙箱伸缩（历史草案） | [../project-agent/enterprise-deployment.md](../project-agent/enterprise-deployment.md) |
 | 商店与分发 | [../project-agent/agent-skill-marketplace.md](../project-agent/agent-skill-marketplace.md) |
 | 历史 `project_agent` 架构长文 | [../project-agent/workflow-agent-architecture.md](../project-agent/workflow-agent-architecture.md) |

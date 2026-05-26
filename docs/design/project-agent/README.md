@@ -11,7 +11,9 @@
 | 产品定位、架构、规格、治理、实现差距 | [**workflow-tool/**](../workflow-tool/) |
 | Coze 调研与契合度 | [coze-workflow-research.md](coze-workflow-research.md)、[coze-fit-analysis.md](coze-fit-analysis.md) |
 | 一节点一 Python（演进） | [python-node-design.md](python-node-design.md) |
-| 企业部署 / 沙箱 | [enterprise-deployment.md](enterprise-deployment.md) |
+| K8s 概念 / 标准部署 | [../deployment/standard-deployment.md](../deployment/standard-deployment.md) |
+| 标准 vs Minikube 方案对比 | [../deployment/standard-vs-minikube.md](../deployment/standard-vs-minikube.md) |
+| 企业部署 / 沙箱（历史草案） | [enterprise-deployment.md](enterprise-deployment.md) |
 | 商店与分发 | [agent-skill-marketplace.md](agent-skill-marketplace.md) |
 
 ## 本目录文档（归档 / 参考）

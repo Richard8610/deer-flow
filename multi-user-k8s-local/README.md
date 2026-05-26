@@ -4,6 +4,9 @@ A **Hub-and-Spoke** multi-user system for DeerFlow that runs entirely on local
 Minikube. Each user gets an isolated DeerFlow backend pod with a dedicated
 PersistentVolumeClaim so data survives pod restarts.
 
+> **阅读建议**：先看 [DeerFlow 标准部署与 K8s 概念](../docs/design/deployment/standard-deployment.md)，再看  
+> [标准部署 vs Minikube Hub-and-Spoke 对比](../docs/design/deployment/standard-vs-minikube.md)。
+
 ## Architecture
 
 ```
