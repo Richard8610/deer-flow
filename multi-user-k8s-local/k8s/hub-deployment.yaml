@@ -1,0 +1,82 @@
+---
+# Secret containing the Hub JWT signing key.
+# In production replace the value with a securely-generated key.
+# Base64 of "change-me-in-production":
+#   echo -n 'change-me-in-production' | base64
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hub-secrets
+  namespace: deerflow
+type: Opaque
+data:
+  secret-key: Y2hhbmdlLW1lLWluLXByb2R1Y3Rpb24=
+
+---
+# PersistentVolumeClaim for the Hub's SQLite database.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hub-data-pvc
+  namespace: deerflow
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hub
+  namespace: deerflow
+  labels:
+    app: hub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hub
+  template:
+    metadata:
+      labels:
+        app: hub
+    spec:
+      serviceAccountName: hub
+      containers:
+        - name: hub
+          image: deerflow-hub:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hub-secrets
+                  key: secret-key
+            - name: DB_PATH
+              value: /data/users.db
+          volumeMounts:
+            - name: hub-data
+              mountPath: /data
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: hub-data
+          persistentVolumeClaim:
+            claimName: hub-data-pvc

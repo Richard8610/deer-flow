@@ -1,0 +1,66 @@
+{
+  "nodes": [
+    {
+      "id": "start",
+      "type": "io",
+      "position": { "x": 40, "y": 200 },
+      "data": {
+        "nodeKind": "start",
+        "label": "Daily Trigger",
+        "description": "Schedule trigger at 8 AM daily"
+      }
+    },
+    {
+      "id": "fetch_news",
+      "type": "process",
+      "position": { "x": 280, "y": 200 },
+      "data": {
+        "nodeKind": "tool",
+        "label": "Fetch News",
+        "description": "Fetch A-Share news from RSS feeds",
+        "toolName": "get_stock_news",
+        "outputFields": ["raw_news[]"]
+      }
+    },
+    {
+      "id": "process_content",
+      "type": "process",
+      "position": { "x": 520, "y": 200 },
+      "data": {
+        "nodeKind": "tool",
+        "label": "Format Content",
+        "description": "Extract and format 10 key news items",
+        "inputFields": ["raw_news[]"],
+        "outputFields": ["formatted_content"]
+      }
+    },
+    {
+      "id": "save_and_notify",
+      "type": "process",
+      "position": { "x": 760, "y": 200 },
+      "data": {
+        "nodeKind": "tool",
+        "label": "Save & Notify",
+        "description": "Save output and send notification",
+        "inputFields": ["formatted_content"],
+        "outputFields": ["final_output", "saved_path"]
+      }
+    },
+    {
+      "id": "end",
+      "type": "io",
+      "position": { "x": 1000, "y": 200 },
+      "data": {
+        "nodeKind": "end",
+        "label": "Done",
+        "description": "News delivered"
+      }
+    }
+  ],
+  "edges": [
+    { "id": "e1", "source": "start", "target": "fetch_news", "type": "dataflow", "animated": true },
+    { "id": "e2", "source": "fetch_news", "target": "process_content", "type": "dataflow", "animated": true },
+    { "id": "e3", "source": "process_content", "target": "save_and_notify", "type": "dataflow", "animated": true },
+    { "id": "e4", "source": "save_and_notify", "target": "end", "type": "dataflow", "animated": true }
+  ]
+}

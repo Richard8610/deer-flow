@@ -1,0 +1,37 @@
+---
+# ClusterIP service for in-cluster traffic (e.g. Ingress → Hub).
+apiVersion: v1
+kind: Service
+metadata:
+  name: hub
+  namespace: deerflow
+  labels:
+    app: hub
+spec:
+  selector:
+    app: hub
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP
+
+---
+# NodePort service for direct access via `minikube service hub-nodeport -n deerflow`
+# or http://<minikube-ip>:30080
+apiVersion: v1
+kind: Service
+metadata:
+  name: hub-nodeport
+  namespace: deerflow
+  labels:
+    app: hub
+spec:
+  selector:
+    app: hub
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      nodePort: 30080
+  type: NodePort

@@ -1,0 +1,15 @@
+project_name: finance_news_push
+version: "1.0.0"
+description: "每日8点自动抓取A股行情新闻，提取10条关键内容推送"
+
+# Runtime parameters
+workflow:
+  timeout_seconds: 120
+
+# Settings
+news:
+  max_items: 10
+  rss_feeds:
+    - https://rss.sina.com.cn/finance/stock/hs.xml
+    - https://www.10jqka.com.cn/rss/all.xml
+  schedule: "0 8 * * *"
