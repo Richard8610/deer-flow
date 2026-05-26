@@ -238,6 +238,42 @@ async def logout(current_user: dict = Depends(get_current_user)) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Skills list: /api/skills
+# Read from skills/ directory bundled into the hub image at /app/skills/.
+# Registered BEFORE the catch-all proxy so the hub serves it directly.
+# ---------------------------------------------------------------------------
+
+_SKILLS_DIR = Path(os.path.dirname(__file__)) / "skills"
+
+
+@app.get("/api/skills")
+async def list_skills(_: dict = Depends(get_current_user)) -> dict:
+    skills = []
+    for sub in ("public", "custom"):
+        subdir = _SKILLS_DIR / sub
+        if not subdir.exists():
+            continue
+        for skill_dir in sorted(subdir.iterdir()):
+            md = skill_dir / "SKILL.md"
+            if not md.exists():
+                continue
+            text = md.read_text(encoding="utf-8")
+            m = re.match(r"^---\s*\n(.*?)\n---", text, re.DOTALL)
+            if not m:
+                continue
+            fm = m.group(1)
+            name_m = re.search(r"^name:\s*(.+)$", fm, re.MULTILINE)
+            desc_m = re.search(r"^description:\s*(.+)$", fm, re.MULTILINE)
+            if name_m:
+                skills.append({
+                    "name": name_m.group(1).strip(),
+                    "description": desc_m.group(1).strip() if desc_m else "",
+                    "category": sub,
+                })
+    return {"skills": skills}
+
+
+# ---------------------------------------------------------------------------
 # Workflow project persistence: /api/workflow/*
 # Stored per-user on the hub's PVC at /data/projects/{user_id}/{project}/
 # Must be registered BEFORE the catch-all /api/{path} proxy.

@@ -12,6 +12,21 @@ rm -rf "$REPO_ROOT/multi-user-k8s-local/workflow_frontend_dist"
 cp -r dist/ "$REPO_ROOT/multi-user-k8s-local/workflow_frontend_dist"
 cd "$REPO_ROOT"
 
+# Snapshot skills/ into the Docker build context (only SKILL.md files needed)
+echo "Snapshotting skills/..."
+rm -rf "$REPO_ROOT/multi-user-k8s-local/skills_snapshot"
+for sub in public custom; do
+  src="$REPO_ROOT/skills/$sub"
+  [ -d "$sub" ] || [ -d "$src" ] || continue
+  find "$src" -name "SKILL.md" | while read -r md; do
+    skill_dir=$(dirname "$md")
+    rel="${skill_dir#$REPO_ROOT/skills/}"
+    dest="$REPO_ROOT/multi-user-k8s-local/skills_snapshot/$rel"
+    mkdir -p "$dest"
+    cp "$md" "$dest/SKILL.md"
+  done
+done
+
 echo "Pointing Docker CLI to Minikube's Docker daemon..."
 eval $(minikube docker-env)
 
