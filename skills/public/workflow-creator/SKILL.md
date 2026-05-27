@@ -10,7 +10,7 @@ allowed-tools:
   - web_fetch
 ---
 
-# Project Agent Skill
+# Workflow Creator Skill
 
 ## Overview
 
@@ -143,3 +143,43 @@ Always mention the `projects/{project_name}/` directory so the user can open it 
 3. `config` — Write `projects/finance_news_push/config/workflow.yaml` with API keys placeholders and schedule config.
 
 **Parallel execution:** tasks 1 and 3 run simultaneously; task 2 starts after task 1 completes (depends on research output).
+
+## Implementation Scripts
+
+The executable implementation of this skill lives in `scripts/` alongside this file:
+
+| File | Purpose |
+|---|---|
+| `scripts/state.py` | `WorkflowState` TypedDict shared by all nodes |
+| `scripts/prompts.py` | System prompts for decompose / plan / evaluate / synthesize nodes |
+| `scripts/nodes.py` | Async node functions: `parse_input`, `decompose`, `search_skills`, `plan_workflow`, `execute_subtask`, `evaluate`, `prepare_retry`, `synthesize` |
+| `scripts/graph.py` | `make_workflow_graph()` — builds the LangGraph `StateGraph`; `load_project_graph()` — discovers per-project graphs |
+| `scripts/agent.py` | Entry-point factories: `make_workflow_agent`, `make_project_agent`, `make_competitive_analysis_agent` |
+| `scripts/__init__.py` | Package exports |
+
+### Invoking Programmatically
+
+```python
+from skills.public.workflow_creator.scripts.agent import make_workflow_agent
+from langchain_core.messages import HumanMessage
+
+agent = make_workflow_agent(config={})
+result = await agent.ainvoke({"messages": [HumanMessage(content="Build a stock price alert system")]})
+print(result["final_output"])
+```
+
+### Graph Shape
+
+```
+START → parse_input → decompose → search_skills → plan_workflow
+                                                         ↓ Send × N (parallel)
+                                               execute_subtask
+                                                         ↓ (join)
+                                                      evaluate
+                                                    ↙          ↘
+                                           synthesize     prepare_retry
+                                               ↓                ↓ Send × M (failed only)
+                                              END          execute_subtask (retry)
+```
+
+Max retries: 2. After 2 failed evaluations the agent synthesizes with whatever results it has.
