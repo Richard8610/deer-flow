@@ -1,5 +1,5 @@
 ---
-name: project-agent
+name: workflow-creator
 description: Execute complex multi-step projects by decomposing them into parallel subagent tasks. Use when the user asks to build, implement, research, or automate something requiring multiple steps. Follows a decompose → plan → execute → evaluate → synthesize pipeline.
 allowed-tools:
   - bash
