@@ -1,5 +1,6 @@
 from . import (
     artifacts,
+    assist,
     assistants_compat,
     input_polish,
     mcp,
@@ -9,11 +10,13 @@ from . import (
     suggestions,
     thread_runs,
     threads,
+    tools,
     uploads,
 )
 
 __all__ = [
     "artifacts",
+    "assist",
     "assistants_compat",
     "input_polish",
     "mcp",
@@ -23,5 +26,6 @@ __all__ = [
     "suggestions",
     "threads",
     "thread_runs",
+    "tools",
     "uploads",
 ]

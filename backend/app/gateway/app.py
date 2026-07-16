@@ -14,6 +14,7 @@ from app.gateway.deps import langgraph_runtime
 from app.gateway.routers import (
     agents,
     artifacts,
+    assist,
     assistants_compat,
     auth,
     channel_connections,
@@ -32,6 +33,7 @@ from app.gateway.routers import (
     suggestions,
     thread_runs,
     threads,
+    tools,
     uploads,
 )
 from app.gateway.trace_middleware import TraceMiddleware, resolve_trace_enabled
@@ -543,6 +545,12 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
         logger.info("GitHub webhooks route mounted at /api/webhooks/github")
     else:
         logger.warning("GitHub webhooks route NOT mounted: GITHUB_WEBHOOK_SECRET unset and DEER_FLOW_ALLOW_UNVERIFIED_GITHUB_WEBHOOKS not set. /api/webhooks/github will respond 404. Configure either env var to enable the route.")
+
+    # Tools API is mounted at /api/tools and /api/tool-groups
+    app.include_router(tools.router)
+
+    # AI Assist API — lightweight direct LLM stream for dashboard chat
+    app.include_router(assist.router)
 
     @app.get("/health", tags=["health"])
     async def health_check() -> dict[str, str]:
