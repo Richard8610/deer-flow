@@ -10,6 +10,7 @@ from pathlib import Path
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
+from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
 from pptx.oxml.ns import qn
 from pptx.util import Inches, Pt
 
@@ -96,18 +97,30 @@ def _font(run, size, bold=False, color=BODY):
         el.set("typeface", CJK_FONT)
 
 
-def _set_title(slide, text, size=32):
-    tf = slide.shapes.title.text_frame
+def _place(shape, left, top, width, height):
+    """The default template is 4:3; every shape is placed by hand so nothing stops at two thirds of a 16:9 slide."""
+    shape.left, shape.top, shape.width, shape.height = Inches(left), Inches(top), Inches(width), Inches(height)
+
+
+def _set_title(slide, text, size=32, box=(0.8, 0.45, 11.7, 1.2), anchor=MSO_ANCHOR.MIDDLE):
+    shape = slide.shapes.title
+    _place(shape, *box)
+    tf = shape.text_frame
     tf.text = text
     tf.word_wrap = True
+    tf.vertical_anchor = anchor
     for p in tf.paragraphs:
+        p.alignment = PP_ALIGN.LEFT
         for r in p.runs:
             _font(r, size, bold=True, color=ACCENT)
+            r._r.get_or_add_rPr().set("cap", "none")          # the section layout upper-cases Latin text otherwise
 
 
-def _fill(placeholder, items):
+def _fill(placeholder, items, box=(0.8, 1.85, 11.7, 5.0)):
+    _place(placeholder, *box)
     tf = placeholder.text_frame
     tf.word_wrap = True
+    tf.vertical_anchor = MSO_ANCHOR.TOP
     size = 22 if len(items) <= 5 else 18
     for i, item in enumerate(items):
         p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
@@ -140,10 +153,12 @@ def build(outline, output):
     prs.slide_width, prs.slide_height = Inches(13.333), Inches(7.5)
 
     first = prs.slides.add_slide(prs.slide_layouts[L_TITLE])
-    _set_title(first, outline["title"].strip(), 40)
+    _set_title(first, outline["title"].strip(), 40, box=(0.8, 2.3, 11.7, 1.6), anchor=MSO_ANCHOR.BOTTOM)
     subtitle = " · ".join(x for x in (outline.get("subtitle"), outline.get("author"), outline.get("date")) if x)
     if subtitle:
+        _place(first.placeholders[1], 0.8, 4.1, 11.7, 1.0)
         first.placeholders[1].text_frame.text = subtitle
+        first.placeholders[1].text_frame.paragraphs[0].alignment = PP_ALIGN.LEFT
         for r in first.placeholders[1].text_frame.paragraphs[0].runs:
             _font(r, 20)
     else:
@@ -157,17 +172,19 @@ def build(outline, output):
             _fill(slide.placeholders[1], s["bullets"])
         elif kind == "section":
             slide = prs.slides.add_slide(prs.slide_layouts[L_SECTION])
-            _set_title(slide, s["title"].strip(), 36)
+            _set_title(slide, s["title"].strip(), 36, box=(0.8, 2.4, 11.7, 1.4), anchor=MSO_ANCHOR.BOTTOM)
             body = [p for p in slide.placeholders if p.placeholder_format.idx == 1]
             if s.get("bullets"):
-                _fill(body[0], _bullets(s["bullets"], "bullets"))
+                _fill(body[0], _bullets(s["bullets"], "bullets"), box=(0.8, 3.95, 11.7, 1.2))
+                for p in body[0].text_frame.paragraphs:
+                    p.alignment = PP_ALIGN.LEFT
             elif body:
                 body[0]._element.getparent().remove(body[0]._element)
         elif kind == "two-column":
             slide = prs.slides.add_slide(prs.slide_layouts[L_TWO])
             _set_title(slide, s["title"].strip())
-            _fill(slide.placeholders[1], s["left"])
-            _fill(slide.placeholders[2], s["right"])
+            _fill(slide.placeholders[1], s["left"], box=(0.8, 1.85, 5.7, 5.0))
+            _fill(slide.placeholders[2], s["right"], box=(6.8, 1.85, 5.7, 5.0))
         else:
             slide = prs.slides.add_slide(prs.slide_layouts[L_TITLE_ONLY])
             _set_title(slide, s["title"].strip())

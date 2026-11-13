@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from pptx import Presentation
+from pptx.util import Inches
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from skill_loader import load  # noqa: E402
@@ -60,3 +61,14 @@ def test_cli_exit_codes(tmp_path, capsys):
     assert gen.main(["--outline", str(src), "--output", str(out)]) == 1
     assert "error:" in capsys.readouterr().err
     assert gen.main(["--outline", str(tmp_path / "missing.json"), "--output", str(out)]) == 1
+
+
+def test_every_shape_sits_inside_the_16_9_slide(tmp_path):
+    prs = Presentation(gen.build(OUTLINE, tmp_path / "d.pptx"))
+    for n, slide in enumerate(prs.slides, 1):
+        for shape in slide.shapes:
+            assert shape.left >= 0 and shape.top >= 0, (n, shape.name)
+            assert shape.left + shape.width <= prs.slide_width, (n, shape.name)
+            assert shape.top + shape.height <= prs.slide_height, (n, shape.name)
+        assert slide.shapes.title.width == Inches(11.7), n            # not left at the 4:3 template width
+        assert slide.shapes.title.left == Inches(0.8), n
